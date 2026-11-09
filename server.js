@@ -488,6 +488,18 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .footer-col a { color: var(--muted); text-decoration: none; font-size: 14px; transition: color .2s; cursor: pointer; }
   .footer-col a:hover { color: var(--text); }
   .footer-bottom { border-top: 1px solid var(--border); padding-top: 32px; display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
+
+  /* Controls (Search, Sort, Brands) */
+  .controls-row { display: flex; gap: 16px; justify-content: center; margin-bottom: 24px; flex-wrap: wrap; }
+  .search-box { position: relative; max-width: 400px; width: 100%; }
+  .search-box input { width: 100%; padding: 12px 16px 12px 40px; border-radius: 100px; border: 1px solid var(--border); font-size: 15px; outline: none; transition: border-color .2s; background: var(--card); font-family: inherit; }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-box svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); }
+  .sort-select { padding: 12px 32px 12px 16px; border-radius: 100px; border: 1px solid var(--border); font-size: 15px; outline: none; background: var(--card); cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 14px; font-family: inherit; font-weight: 500; color: var(--text); }
+  .brand-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 32px; }
+  .brand-filter { padding: 8px 16px; border-radius: 100px; border: 1px solid var(--border); background: transparent; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .2s; font-family: inherit; color: var(--text); }
+  .brand-filter:hover { background: rgba(0,0,0,0.04); }
+  .brand-filter.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   
   @media (max-width: 768px) {
     .grid { grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -529,6 +541,22 @@ const indexHTML = String.raw`<!DOCTYPE html>
   </section>
   
   <div class="container">
+    
+    <div class="controls-row">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="search-input" placeholder="Поиск по модели...">
+      </div>
+      <select class="sort-select" id="sort-select">
+        <option value="default">По умолчанию</option>
+        <option value="price-asc">Сначала дешевые</option>
+        <option value="price-desc">Сначала дорогие</option>
+        <option value="newest">Сначала новые</option>
+      </select>
+    </div>
+    
+    <div class="brand-filters" id="brand-filters"></div>
+
     <div class="filters" id="filters">
       <button class="filter active" data-status="all">Все</button>
       <button class="filter" data-status="available">В наличии</button>
@@ -722,6 +750,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
   var STATUS_BTN   = { available:'Забронировать', reserved:'Узнать', sold:'Уведомить' };
   var allPhones = [];
   var currentFilter = 'all';
+  var currentBrand = 'all';
+  var currentSearch = '';
+  var currentSort = 'default';
   var selectedPhone = null;
   var currentActionType = 'order';
   var timersInterval = null;
@@ -830,6 +861,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   function load() {
     fetch('/api/phones').then(function(r) { return r.json(); }).then(function(data) {
       allPhones = data; 
+      renderBrands();
       render(); 
       renderRecent();
     }).catch(function() {
@@ -938,25 +970,63 @@ const indexHTML = String.raw`<!DOCTYPE html>
     '</article>';
   }
 
+  function renderBrands() {
+    var brands = [];
+    allPhones.forEach(function(p) {
+      if (p.brand && brands.indexOf(p.brand) === -1) brands.push(p.brand);
+    });
+    var container = document.getElementById('brand-filters');
+    if (brands.length === 0) { container.innerHTML = ''; return; }
+    
+    var html = '<button class="brand-filter ' + (currentBrand === 'all' ? 'active' : '') + '" data-brand="all">Все бренды</button>';
+    brands.forEach(function(b) {
+      html += '<button class="brand-filter ' + (currentBrand === b ? 'active' : '') + '" data-brand="' + esc(b) + '">' + esc(b) + '</button>';
+    });
+    container.innerHTML = html;
+  }
+
   function render() {
     var now = new Date().getTime();
-    var list = [];
-    
-    if (currentFilter === 'all') {
-      list = allPhones;
-    } else if (currentFilter === 'discounted') {
-      list = allPhones.filter(function(p) {
+    var list = allPhones.slice();
+
+    // Фильтр по статусу
+    if (currentFilter === 'discounted') {
+      list = list.filter(function(p) {
         var isDiscounted = p.old_price && p.old_price > p.price;
         var hasTimer = p.discount_ends && new Date(p.discount_ends).getTime() > now;
         if (p.discount_ends && !hasTimer) return false;
         return isDiscounted;
       });
-    } else {
-      list = allPhones.filter(function(p) { return p.status === currentFilter; });
+    } else if (currentFilter !== 'all') {
+      list = list.filter(function(p) { return p.status === currentFilter; });
+    }
+
+    // Фильтр по бренду
+    if (currentBrand !== 'all') {
+      list = list.filter(function(p) { return p.brand === currentBrand; });
+    }
+
+    // Поиск
+    if (currentSearch) {
+      var q = currentSearch.toLowerCase();
+      list = list.filter(function(p) {
+        return (p.brand + ' ' + p.model).toLowerCase().indexOf(q) !== -1;
+      });
+    }
+
+    // Сортировка
+    if (currentSort === 'price-asc') {
+      list.sort(function(a, b) { return a.price - b.price; });
+    } else if (currentSort === 'price-desc') {
+      list.sort(function(a, b) { return b.price - a.price; });
+    } else if (currentSort === 'newest') {
+      list.sort(function(a, b) { return b.id - a.id; });
     }
 
     if (list.length === 0) {
-      var emptyText = currentFilter === 'discounted' ? 'Сейчас нет товаров со скидкой' : 'В этой категории пока нет товаров';
+      var emptyText = 'Ничего не найдено';
+      if (currentFilter === 'discounted') emptyText = 'Сейчас нет товаров со скидкой';
+      else if (currentFilter !== 'all') emptyText = 'В этой категории пока нет товаров';
       grid.innerHTML = '<div class="empty" style="grid-column:1/-1">' + emptyText + '</div>';
       return;
     }
@@ -1263,6 +1333,24 @@ const indexHTML = String.raw`<!DOCTYPE html>
       reviewSubmitBtn.disabled = false;
       reviewSubmitBtn.textContent = 'Отправить';
     }
+  });
+
+  document.getElementById('search-input').addEventListener('input', function(e) {
+    currentSearch = e.target.value;
+    render();
+  });
+
+  document.getElementById('sort-select').addEventListener('change', function(e) {
+    currentSort = e.target.value;
+    render();
+  });
+
+  document.getElementById('brand-filters').addEventListener('click', function(e) {
+    var btn = e.target.closest('.brand-filter');
+    if (!btn) return;
+    currentBrand = btn.dataset.brand;
+    renderBrands();
+    render();
   });
 
   load();
