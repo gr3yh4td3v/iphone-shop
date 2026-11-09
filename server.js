@@ -35,12 +35,20 @@ function writeDB(data) {
 }
 
 // ---------- Telegram ----------
+const getTelegramApiBase = () => {
+  let apiBase = process.env.TELEGRAM_API_PROXY_URL || 'https://api.telegram.org';
+  return apiBase.replace(/\/$/, '');
+};
+
 async function notify(text) {
+  console.log('--- Попытка отправки в личку ---');
+  if (!process.env.BOT_TOKEN) console.log('❌ ОШИБКА: BOT_TOKEN не задан в переменных Railway');
+  if (!process.env.CHAT_ID) console.log('❌ ОШИБКА: CHAT_ID не задан в переменных Railway');
   if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) return null;
-
-  // Используем URL прокси, если он задан, иначе идем напрямую
-  const apiBase = process.env.TELEGRAM_API_PROXY_URL || 'https://api.telegram.org';
-
+  
+  const apiBase = getTelegramApiBase();
+  console.log('Отправка через:', apiBase);
+  
   try {
     const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -48,56 +56,58 @@ async function notify(text) {
       body: JSON.stringify({ chat_id: process.env.CHAT_ID, text, parse_mode: 'HTML' })
     });
     const data = await res.json();
-    if (!data.ok) return `Ошибка Telegram: ${data.description}`;
+    if (!data.ok) {
+      console.error('❌ Ошибка Telegram (личка):', data.description);
+      return `Ошибка Telegram: ${data.description}`;
+    }
+    console.log('✅ Уведомление в личку отправлено успешно!');
     return null;
   } catch (e) {
+    console.error('❌ Критическая ошибка сети (личка):', e.message);
     return 'Ошибка соединения с Telegram.';
+  }
+}
+
+async function postToChannel(phone) {
+  console.log('--- Попытка отправки в канал ---');
+  if (!process.env.BOT_TOKEN) console.log('❌ ОШИБКА: BOT_TOKEN не задан');
+  if (!process.env.CHANNEL_ID) console.log('❌ ОШИБКА: CHANNEL_ID не задан в переменных Railway');
+  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
+  
+  const apiBase = getTelegramApiBase();
+  const siteUrl = 'https://iphone-shop.up.railway.app';
+  const caption = `🔥 <b>Новое поступление!</b>\n\n` +
+                  `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
+                  `💰 Цена: <b>${Number(phone.price).toLocaleString('ru-RU')} ₽</b>\n\n` +
+                  `👉 <a href="${siteUrl}">Смотреть на сайте</a>`;
+
+  console.log('Отправка в канал через:', apiBase);
+
+  try {
+    const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: process.env.CHANNEL_ID,
+        text: caption,
+        parse_mode: 'HTML'
+      })
+    });
+    
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('❌ Ошибка Telegram (канал):', data.description);
+    } else {
+      console.log('✅ Пост в канал успешно отправлен!');
+    }
+  } catch (e) {
+    console.error('❌ Критическая ошибка сети (канал):', e.message);
   }
 }
 
 const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const STATUSES = ['available', 'reserved', 'sold'];
-
-async function postToChannel(phone) {
-  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
-  
-  const apiBase = process.env.TELEGRAM_API_PROXY_URL || 'https://api.telegram.org';
-  const siteUrl = 'https://iphone-shop.up.railway.app';
-  const caption = `🔥 <b>Новое поступление!</b>\n\n` +
-                  `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
-                  `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}\n` +
-                  `🔋 АКБ: ${esc(phone.battery) || '—'}%\n` +
-                  `💰 Цена: <b>${Number(phone.price).toLocaleString('ru-RU')} ₽</b>\n\n` +
-                  `👉 <a href="${siteUrl}">Смотреть на сайте</a>`;
-
-  try {
-    if (phone.images && phone.images.length > 0) {
-      await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendPhoto`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: process.env.CHANNEL_ID,
-          photo: phone.images[0],
-          caption: caption,
-          parse_mode: 'HTML'
-        })
-      });
-    } else {
-      await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: process.env.CHANNEL_ID,
-          text: caption,
-          parse_mode: 'HTML'
-        })
-      });
-    }
-  } catch (e) {
-    console.error('Ошибка автопостинга в канал:', e);
-  }
-}
 
 // ---------- Auth ----------
 function auth(req, res, next) {
@@ -273,8 +283,6 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   writeDB(db);
 
   await notify(`➕ <b>Добавлен товар</b>\n📱 ${esc(brand)} ${esc(model)}\n💰 Цена: ${Number(price).toLocaleString('ru-RU')} ₽`);
-
-  // Вызов автопостинга в канал
   await postToChannel(phone);
 
   res.json({ ok: true, id: phone.id });
