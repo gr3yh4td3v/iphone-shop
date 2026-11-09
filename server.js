@@ -37,17 +37,16 @@ function writeDB(data) {
 // ---------- Telegram ----------
 const getTelegramApiBase = () => {
   let apiBase = process.env.TELEGRAM_API_PROXY_URL || 'https://api.telegram.org';
-  return apiBase.replace(/\/$/, '');
+  return apiBase.replace(/\/$/, ''); // Убираем слэш в конце, если он есть
 };
 
 async function notify(text) {
-  console.log('--- Попытка отправки в личку ---');
-  if (!process.env.BOT_TOKEN) console.log('❌ ОШИБКА: BOT_TOKEN не задан в переменных Railway');
-  if (!process.env.CHAT_ID) console.log('❌ ОШИБКА: CHAT_ID не задан в переменных Railway');
-  if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) return null;
+  if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) {
+    console.log('⚠️ BOT_TOKEN или CHAT_ID не заданы');
+    return null;
+  }
   
   const apiBase = getTelegramApiBase();
-  console.log('Отправка через:', apiBase);
   
   try {
     const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendMessage`, {
@@ -63,35 +62,57 @@ async function notify(text) {
     console.log('✅ Уведомление в личку отправлено успешно!');
     return null;
   } catch (e) {
-    console.error('❌ Критическая ошибка сети (личка):', e.message);
+    console.error('❌ Ошибка соединения с Telegram (личка):', e.message);
     return 'Ошибка соединения с Telegram.';
   }
 }
 
+// Вспомогательная функция для конвертации Base64 в файл для отправки в Telegram
+function dataURItoBlob(dataURI) {
+  const byteString = atob(dataURI.split(',')[1]);
+  const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([ab], { type: mimeString });
+}
+
 async function postToChannel(phone) {
-  console.log('--- Попытка отправки в канал ---');
-  if (!process.env.BOT_TOKEN) console.log('❌ ОШИБКА: BOT_TOKEN не задан');
-  if (!process.env.CHANNEL_ID) console.log('❌ ОШИБКА: CHANNEL_ID не задан в переменных Railway');
-  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
+  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) {
+    console.log('⚠️ BOT_TOKEN или CHANNEL_ID не заданы');
+    return;
+  }
   
   const apiBase = getTelegramApiBase();
   const siteUrl = 'https://iphone-shop.up.railway.app';
   const caption = `🔥 <b>Новое поступление!</b>\n\n` +
                   `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
+                  `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}\n` +
+                  `🔋 АКБ: ${esc(phone.battery) || '—'}%\n` +
                   `💰 Цена: <b>${Number(phone.price).toLocaleString('ru-RU')} ₽</b>\n\n` +
                   `👉 <a href="${siteUrl}">Смотреть на сайте</a>`;
 
-  console.log('Отправка в канал через:', apiBase);
-
   try {
-    const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendMessage`, {
+    const formData = new FormData();
+    formData.append('chat_id', process.env.CHANNEL_ID);
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
+
+    let endpoint = 'sendMessage';
+
+    if (phone.images && phone.images.length > 0) {
+      endpoint = 'sendPhoto';
+      const blob = dataURItoBlob(phone.images[0]);
+      formData.append('photo', blob, 'photo.jpg'); // Имя файла обязательно для Telegram
+    } else {
+      formData.append('text', caption);
+    }
+
+    const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: process.env.CHANNEL_ID,
-        text: caption,
-        parse_mode: 'HTML'
-      })
+      body: formData // fetch автоматически установит правильный Content-Type (multipart/form-data)
     });
     
     const data = await res.json();
@@ -101,7 +122,7 @@ async function postToChannel(phone) {
       console.log('✅ Пост в канал успешно отправлен!');
     }
   } catch (e) {
-    console.error('❌ Критическая ошибка сети (канал):', e.message);
+    console.error('❌ Критическая ошибка при отправке в канал:', e.message);
   }
 }
 
@@ -331,7 +352,7 @@ app.delete('/api/admin/phones/:id', auth, (req, res) => {
 });
 
 // ============================================================
-//                     HTML PAGES
+//                     HTML PAGES (FRONTEND)
 // ============================================================
 
 const indexHTML = String.raw`<!DOCTYPE html>
@@ -843,7 +864,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
   var phoneSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>';
 
-  // Логика звездного рейтинга на JS
   var stars = document.querySelectorAll('#star-rating .star');
   var ratingInput = document.getElementById('rating-input');
 
@@ -1385,7 +1405,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     render();
   });
 
-  // Кастомный выпадающий список
   var sortBtn = document.getElementById('sort-select-btn');
   var sortOptions = document.getElementById('sort-options');
   var sortSelectedText = document.getElementById('sort-selected-text');
