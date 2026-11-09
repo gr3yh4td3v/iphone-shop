@@ -37,7 +37,7 @@ function writeDB(data) {
 // ---------- Telegram ----------
 const getTelegramApiBase = () => {
   let apiBase = process.env.TELEGRAM_API_PROXY_URL || 'https://api.telegram.org';
-  return apiBase.replace(/\/$/, ''); // Убираем слэш в конце, если он есть
+  return apiBase.replace(/\/$/, '');
 };
 
 async function notify(text) {
@@ -67,7 +67,7 @@ async function notify(text) {
   }
 }
 
-// Вспомогательная функция для конвертации Base64 в файл для отправки в Telegram
+// Вспомогательная функция для конвертации Base64 в файл
 function dataURItoBlob(dataURI) {
   const byteString = atob(dataURI.split(',')[1]);
   const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
@@ -86,7 +86,8 @@ async function postToChannel(phone) {
   }
   
   const apiBase = getTelegramApiBase();
-  const siteUrl = 'https://iphone-shop.up.railway.app';
+  // Ссылка на конкретный товар с параметром ?id=
+  const siteUrl = `https://iphone-shop.up.railway.app/?id=${phone.id}`;
   const caption = `🔥 <b>Новое поступление!</b>\n\n` +
                   `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
                   `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}\n` +
@@ -97,22 +98,42 @@ async function postToChannel(phone) {
   try {
     const formData = new FormData();
     formData.append('chat_id', process.env.CHANNEL_ID);
-    formData.append('caption', caption);
-    formData.append('parse_mode', 'HTML');
-
+    
+    const images = phone.images || [];
     let endpoint = 'sendMessage';
 
-    if (phone.images && phone.images.length > 0) {
-      endpoint = 'sendPhoto';
-      const blob = dataURItoBlob(phone.images[0]);
-      formData.append('photo', blob, 'photo.jpg'); // Имя файла обязательно для Telegram
-    } else {
+    if (images.length === 0) {
+      // Только текст
       formData.append('text', caption);
+      formData.append('parse_mode', 'HTML');
+      
+    } else if (images.length === 1) {
+      // Одно фото
+      endpoint = 'sendPhoto';
+      const blob = dataURItoBlob(images[0]);
+      formData.append('photo', blob, 'photo.jpg');
+      formData.append('caption', caption);
+      formData.append('parse_mode', 'HTML');
+
+    } else {
+      // Несколько фото (Альбом)
+      endpoint = 'sendMediaGroup';
+      const mediaArray = [];
+      for (let i = 0; i < images.length; i++) {
+        const blob = dataURItoBlob(images[i]);
+        formData.append(`file${i}`, blob, `photo${i}.jpg`);
+        mediaArray.push({
+          type: 'photo',
+          media: `attach://file${i}`,
+          ...(i === 0 ? { caption: caption, parse_mode: 'HTML' } : {}) // Подпись только к первому фото
+        });
+      }
+      formData.append('media', JSON.stringify(mediaArray));
     }
 
     const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/${endpoint}`, {
       method: 'POST',
-      body: formData // fetch автоматически установит правильный Content-Type (multipart/form-data)
+      body: formData
     });
     
     const data = await res.json();
@@ -952,6 +973,13 @@ const indexHTML = String.raw`<!DOCTYPE html>
       allPhones = data; 
       render(); 
       renderRecent();
+      
+      // Проверка ссылки на конкретный товар (?id=)
+      const urlParams = new URLSearchParams(window.location.search);
+      const phoneId = urlParams.get('id');
+      if (phoneId) {
+        setTimeout(function() { openDetail(Number(phoneId)); }, 100); // Задержка для прогрузки DOM
+      }
     }).catch(function() {
       grid.innerHTML = '<div class="empty">Ошибка загрузки данных</div>';
     });
