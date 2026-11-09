@@ -37,8 +37,12 @@ function writeDB(data) {
 // ---------- Telegram ----------
 async function notify(text) {
   if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) return null;
+
+  // Используем URL прокси, если он задан, иначе идем напрямую
+  const apiBase = process.env.TELEGRAM_API_PROXY_URL || 'https://api.telegram.org';
+
   try {
-    const res = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+    const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: process.env.CHAT_ID, text, parse_mode: 'HTML' })
@@ -58,6 +62,7 @@ const STATUSES = ['available', 'reserved', 'sold'];
 async function postToChannel(phone) {
   if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
   
+  const apiBase = process.env.TELEGRAM_API_PROXY_URL || 'https://api.telegram.org';
   const siteUrl = 'https://iphone-shop.up.railway.app';
   const caption = `🔥 <b>Новое поступление!</b>\n\n` +
                   `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
@@ -68,7 +73,7 @@ async function postToChannel(phone) {
 
   try {
     if (phone.images && phone.images.length > 0) {
-      await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendPhoto`, {
+      await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendPhoto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,7 +84,7 @@ async function postToChannel(phone) {
         })
       });
     } else {
-      await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+      await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -268,7 +273,7 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   writeDB(db);
 
   await notify(`➕ <b>Добавлен товар</b>\n📱 ${esc(brand)} ${esc(model)}\n💰 Цена: ${Number(price).toLocaleString('ru-RU')} ₽`);
-  
+
   // Вызов автопостинга в канал
   await postToChannel(phone);
 
