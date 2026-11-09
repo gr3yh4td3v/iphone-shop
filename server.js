@@ -23,6 +23,7 @@ function readDB() {
       if (p.views === undefined) p.views = 0;
       if (p.orders === undefined) p.orders = 0;
       if (p.is_hit === undefined) p.is_hit = false;
+      if (p.status === undefined) p.status = 'available';
     });
 
     return data;
@@ -41,13 +42,8 @@ const getTelegramApiBase = () => {
 };
 
 async function notify(text) {
-  if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) {
-    console.log('⚠️ BOT_TOKEN или CHAT_ID не заданы');
-    return null;
-  }
-  
+  if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) return null;
   const apiBase = getTelegramApiBase();
-  
   try {
     const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -55,38 +51,26 @@ async function notify(text) {
       body: JSON.stringify({ chat_id: process.env.CHAT_ID, text, parse_mode: 'HTML' })
     });
     const data = await res.json();
-    if (!data.ok) {
-      console.error('❌ Ошибка Telegram (личка):', data.description);
-      return `Ошибка Telegram: ${data.description}`;
-    }
-    console.log('✅ Уведомление в личку отправлено успешно!');
+    if (!data.ok) console.error('❌ Ошибка Telegram (личка):', data.description);
     return null;
   } catch (e) {
-    console.error('❌ Ошибка соединения с Telegram (личка):', e.message);
+    console.error('❌ Ошибка соединения с Telegram:', e.message);
     return 'Ошибка соединения с Telegram.';
   }
 }
 
-// Вспомогательная функция для конвертации Base64 в файл
 function dataURItoBlob(dataURI) {
   const byteString = atob(dataURI.split(',')[1]);
   const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
   const ab = new ArrayBuffer(byteString.length);
   const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
   return new Blob([ab], { type: mimeString });
 }
 
 async function postToChannel(phone) {
-  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) {
-    console.log('⚠️ BOT_TOKEN или CHANNEL_ID не заданы');
-    return;
-  }
-  
+  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
   const apiBase = getTelegramApiBase();
-  // Ссылка на конкретный товар с параметром ?id=
   const siteUrl = `https://iphone-shop.up.railway.app/?id=${phone.id}`;
   const caption = `🔥 <b>Новое поступление!</b>\n\n` +
                   `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
@@ -98,58 +82,38 @@ async function postToChannel(phone) {
   try {
     const formData = new FormData();
     formData.append('chat_id', process.env.CHANNEL_ID);
-    
     const images = phone.images || [];
     let endpoint = 'sendMessage';
 
     if (images.length === 0) {
-      // Только текст
       formData.append('text', caption);
       formData.append('parse_mode', 'HTML');
-      
     } else if (images.length === 1) {
-      // Одно фото
       endpoint = 'sendPhoto';
-      const blob = dataURItoBlob(images[0]);
-      formData.append('photo', blob, 'photo.jpg');
+      formData.append('photo', dataURItoBlob(images[0]), 'photo.jpg');
       formData.append('caption', caption);
       formData.append('parse_mode', 'HTML');
-
     } else {
-      // Несколько фото (Альбом)
       endpoint = 'sendMediaGroup';
       const mediaArray = [];
       for (let i = 0; i < images.length; i++) {
-        const blob = dataURItoBlob(images[i]);
-        formData.append(`file${i}`, blob, `photo${i}.jpg`);
-        mediaArray.push({
-          type: 'photo',
-          media: `attach://file${i}`,
-          ...(i === 0 ? { caption: caption, parse_mode: 'HTML' } : {}) // Подпись только к первому фото
-        });
+        formData.append(`file${i}`, dataURItoBlob(images[i]), `photo${i}.jpg`);
+        mediaArray.push({ type: 'photo', media: `attach://file${i}`, ...(i === 0 ? { caption, parse_mode: 'HTML' } : {}) });
       }
       formData.append('media', JSON.stringify(mediaArray));
     }
 
-    const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/${endpoint}`, {
-      method: 'POST',
-      body: formData
-    });
-    
+    const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/${endpoint}`, { method: 'POST', body: formData });
     const data = await res.json();
-    if (!data.ok) {
-      console.error('❌ Ошибка Telegram (канал):', data.description);
-    } else {
-      console.log('✅ Пост в канал успешно отправлен!');
-    }
+    if (!data.ok) console.error('❌ Ошибка Telegram (канал):', data.description);
+    else console.log('✅ Пост в канал успешно отправлен!');
   } catch (e) {
     console.error('❌ Критическая ошибка при отправке в канал:', e.message);
   }
 }
 
-const esc = (s) => String(s == null ? '' : s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const STATUSES = ['available', 'reserved', 'sold'];
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const STATUSES = ['available', 'reserved', 'sold', 'draft'];
 
 // ---------- Auth ----------
 function auth(req, res, next) {
@@ -163,7 +127,9 @@ function auth(req, res, next) {
 //                         PUBLIC API
 // ============================================================
 app.get('/api/phones', (req, res) => {
-  res.json(readDB().phones);
+  // На сайт отдаем только те товары, которые не в черновике
+  const phones = readDB().phones.filter(p => p.status !== 'draft');
+  res.json(phones);
 });
 
 app.get('/api/reviews', (req, res) => {
@@ -262,6 +228,20 @@ app.post('/api/admin/login', (req, res) => {
   res.status(401).json({ ok: false, error: 'Неверный пароль' });
 });
 
+// Экспорт базы в CSV
+app.get('/api/admin/export', auth, (req, res) => {
+  const db = readDB();
+  let csv = 'ID;Бренд;Модель;Цена;Просмотры;Заявки;Статус;Дата\n';
+  db.phones.forEach(p => {
+    const clean = (s) => `"${String(s || '').replace(/"/g, '""')}"`;
+    csv += `${p.id};${clean(p.brand)};${clean(p.model)};${p.price};${p.views||0};${p.orders||0};${p.status};${clean(new Date(p.created_at).toLocaleString('ru-RU'))}\n`;
+  });
+  
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="iphone-shop-db.csv"');
+  res.send('\uFEFF' + csv); // BOM для корректного открытия в Excel
+});
+
 app.get('/api/admin/reviews', auth, (req, res) => {
   res.json(readDB().reviews.reverse());
 });
@@ -286,7 +266,7 @@ app.delete('/api/admin/reviews/:id', auth, (req, res) => {
 });
 
 app.post('/api/admin/phones', auth, async (req, res) => {
-  const { brand, model, storage, color, price, old_price, discount_ends, condition, description, images, battery, kit, sim, imei, is_hit } = req.body || {};
+  const { brand, model, storage, color, price, old_price, discount_ends, condition, description, images, battery, kit, sim, imei, is_hit, status } = req.body || {};
   if (!brand || !model || !price) return res.status(400).json({ ok: false, error: 'Заполните бренд, модель и цену' });
 
   let finalPrice = Number(price);
@@ -297,6 +277,8 @@ app.post('/api/admin/phones', auth, async (req, res) => {
     finalOldPrice = Number(old_price);
     finalDiscountEnds = discount_ends || null;
   }
+
+  let finalStatus = STATUSES.includes(status) ? status : 'available';
 
   const db = readDB();
   const phone = {
@@ -316,7 +298,7 @@ app.post('/api/admin/phones', auth, async (req, res) => {
     sim: sim || '',
     imei: imei || '',
     is_hit: is_hit === true,
-    status: 'available',
+    status: finalStatus,
     views: 0,
     orders: 0,
     created_at: new Date().toISOString()
@@ -324,8 +306,10 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   db.phones.unshift(phone);
   writeDB(db);
 
-  await notify(`➕ <b>Добавлен товар</b>\n📱 ${esc(brand)} ${esc(model)}\n💰 Цена: ${Number(price).toLocaleString('ru-RU')} ₽`);
-  await postToChannel(phone);
+  if (finalStatus !== 'draft') {
+    await notify(`➕ <b>Добавлен товар</b>\n📱 ${esc(brand)} ${esc(model)}\n💰 Цена: ${Number(price).toLocaleString('ru-RU')} ₽`);
+    await postToChannel(phone);
+  }
 
   res.json({ ok: true, id: phone.id });
 });
@@ -352,7 +336,7 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
   writeDB(db);
 
   if (updated.status !== prev.status) {
-    const labels = { available: 'В наличии', reserved: 'Забронировано', sold: 'Продано' };
+    const labels = { available: 'В наличии', reserved: 'Забронировано', sold: 'Продано', draft: 'Черновик' };
     let msg = `🔄 <b>Статус изменен</b>\n📱 ${esc(updated.brand)} ${esc(updated.model)}\n📌 ${labels[prev.status]} → ${labels[updated.status]}`;
 
     if (updated.status === 'sold') {
@@ -360,6 +344,11 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
     }
 
     await notify(msg);
+
+    // Если товар вытащили из черновика в наличие, публикуем в канал
+    if (updated.status === 'available' && prev.status === 'draft') {
+      await postToChannel(updated);
+    }
   }
   res.json({ ok: true });
 });
@@ -587,7 +576,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .footer-bottom { border-top: 1px solid var(--border); padding-top: 32px; display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
 
   .controls-row { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap; }
-  
   .search-box { position: relative; max-width: 400px; width: 100%; }
   .search-box input { width: 100%; padding: 14px 16px 14px 44px; border-radius: 100px; border: 1px solid var(--border); font-size: 15px; outline: none; transition: all .2s; background: var(--card); font-family: inherit; }
   .search-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,0.1); }
@@ -651,14 +639,19 @@ const indexHTML = String.raw`<!DOCTYPE html>
     
     <div class="controls-row">
       <div class="search-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
         <input type="text" id="search-input" placeholder="Поиск по модели...">
       </div>
       
       <div class="custom-select" id="sort-select-wrapper">
         <button class="custom-select-btn" id="sort-select-btn">
           <span id="sort-selected-text">По умолчанию</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
         </button>
         <div class="custom-select-options" id="sort-options">
           <div class="custom-option active" data-value="default">По умолчанию</div>
@@ -728,7 +721,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <li><a onclick="showInfo('contacts')">Контакты</a></li>
         </ul>
       </div>
-            <div class="footer-col">
+      <div class="footer-col">
         <h4>Связаться с нами</h4>
         <ul>
           <li><a href="https://t.me/ShopysiPhones" target="_blank" style="font-weight:600; color:var(--text); margin-bottom: 8px; display: inline-block;">Написать менеджеру: @ShopysiPhones</a></li>
@@ -738,7 +731,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
     </div>
     <div class="footer-bottom">
       <div>© 2026 iPhone | Shop. Все права защищены.</div>
-      <div><a onclick="showInfo('privacy')" style="cursor:pointer; color:inherit; text-decoration:none; transition: color 0.2s;" onmouseover="this.style.color='#1d1d1f'" onmouseout="this.style.color='inherit'">Политика конфиденциальности</a></div>
+      <div>
+        <a onclick="showInfo('privacy')" style="cursor:pointer; color:inherit; text-decoration:none; transition: color 0.2s;" onmouseover="this.style.color='#1d1d1f'" onmouseout="this.style.color='inherit'">Политика конфиденциальности</a>
+      </div>
     </div>
   </div>
 </footer>
@@ -761,15 +756,22 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
       <div class="detail-trust-badges">
         <span class="trust-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
           Проверен
         </span>
         <span class="trust-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <path d="M9 12l2 2 4-4"></path>
+          </svg>
           Оригинал
         </span>
         <span class="trust-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
           Безопасно
         </span>
       </div>
@@ -792,7 +794,11 @@ const indexHTML = String.raw`<!DOCTYPE html>
     <p id="order-product"></p>
     
     <div class="deposit-note" id="deposit-note">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
       Внесение залога 1000 ₽ гарантирует сохранение устройства за Вами.
     </div>
 
@@ -831,11 +837,31 @@ const indexHTML = String.raw`<!DOCTYPE html>
       <label>Оценка</label>
       <div class="star-rating" id="star-rating">
         <input type="hidden" name="rating" id="rating-input" value="5">
-        <label data-value="1" class="star active"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></label>
-        <label data-value="2" class="star active"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></label>
-        <label data-value="3" class="star active"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></label>
-        <label data-value="4" class="star active"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></label>
-        <label data-value="5" class="star active"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></label>
+        <label data-value="1" class="star active">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </label>
+        <label data-value="2" class="star active">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </label>
+        <label data-value="3" class="star active">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </label>
+        <label data-value="4" class="star active">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </label>
+        <label data-value="5" class="star active">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </label>
       </div>
     </div>
     <div class="input-group">
@@ -974,11 +1000,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
       render(); 
       renderRecent();
       
-      // Проверка ссылки на конкретный товар (?id=)
       const urlParams = new URLSearchParams(window.location.search);
       const phoneId = urlParams.get('id');
       if (phoneId) {
-        setTimeout(function() { openDetail(Number(phoneId)); }, 100); // Задержка для прогрузки DOM
+        setTimeout(function() { openDetail(Number(phoneId)); }, 100);
       }
     }).catch(function() {
       grid.innerHTML = '<div class="empty">Ошибка загрузки данных</div>';
@@ -1524,6 +1549,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .btn-success { background:#e8f5e9; color:#1a7f37; }
   .btn-success:hover { background:#c8e6c9; }
   
+  /* Dashboard */
+  .dashboard { display: flex; gap: 20px; margin-bottom: 32px; }
+  .stat-card { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid var(--border); flex: 1; font-size: 14px; color: var(--muted); display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+  .stat-card span { display: block; font-size: 28px; font-weight: 800; color: var(--text); margin-top: 4px; }
+  .dashboard-actions { display: flex; align-items: center; }
+
   .tabs { display: flex; gap: 10px; margin-bottom: 32px; border-bottom: 1px solid var(--border); }
   .tab { padding: 12px 24px; font-size: 16px; font-weight: 600; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .2s; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
   .tab:hover { color: var(--text); }
@@ -1610,6 +1641,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .status-select.available { color:#1a7f37; border-color:#cce8d5; background-color:#f0fdf4; }
   .status-select.reserved  { color:#b05e00; border-color:#ffe8cc; background-color:#fff7ed; }
   .status-select.sold      { color:#b0251f; border-color:#fecdd3; background-color:#fef2f2; }
+  .status-select.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
   .empty { text-align:center; padding:60px 20px; color:var(--muted); font-size:16px; }
 
   .discount-toggle-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; cursor: pointer; padding: 10px; background: #fafafa; border-radius: 10px; border: 1px solid var(--border); transition: background .2s; }
@@ -1627,11 +1659,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .hit-checkbox-wrap label { margin: 0; cursor: pointer; font-size: 15px; font-weight: 500; }
 
   @media (max-width:720px) {
+    .dashboard { flex-direction: column; }
     .form-grid { grid-template-columns:1fr; }
     .discount-fields { grid-template-columns: 1fr; }
     .phone-row { grid-template-columns:60px 1fr; gap:16px; padding:20px; }
     .phone-price, .phone-actions { grid-column:1 / -1; }
-    .phone-actions { justify-content:flex-end; }
+    .phone-actions { justify-content:flex-end; flex-wrap: wrap; }
     .review-row { grid-template-columns: 1fr; }
     .review-actions { flex-direction: row; }
     .logo img { height: 28px; }
@@ -1665,7 +1698,16 @@ const adminHTML = String.raw`<!DOCTYPE html>
     </div>
   </header>
   <main class="container">
-    <h1 class="page-title">Управление</h1>
+    
+    <!-- ДАШБОРД -->
+    <div class="dashboard">
+      <div class="stat-card">Всего товаров <span id="stat-total">0</span></div>
+      <div class="stat-card">Всего просмотров <span id="stat-views">0</span></div>
+      <div class="stat-card">Всего заявок <span id="stat-orders">0</span></div>
+      <div class="dashboard-actions">
+        <button class="btn" style="height: 100%; font-size: 15px;" onclick="exportCSV()">📥 Скачать базу (CSV)</button>
+      </div>
+    </div>
 
     <div class="tabs">
       <button class="tab active" onclick="switchTab('phones')">Товары</button>
@@ -1772,6 +1814,13 @@ const adminHTML = String.raw`<!DOCTYPE html>
             <div class="hit-checkbox-wrap">
               <input type="checkbox" id="input-hit" name="is_hit">
               <label for="input-hit">🔥 Отметить как «ХИТ ПРОДАЖ»</label>
+            </div>
+          </div>
+
+          <div class="full">
+            <div class="hit-checkbox-wrap" style="background:#f5f5f5; border-color:#ccc;">
+              <input type="checkbox" id="input-draft" name="is_draft">
+              <label for="input-draft">📝 Сохранить как «Черновик» (не будет виден на сайте)</label>
             </div>
           </div>
 
@@ -1941,10 +1990,30 @@ const adminHTML = String.raw`<!DOCTYPE html>
     location.reload();
   };
 
+  window.exportCSV = function() {
+    fetch('/api/admin/export', { headers: { 'x-admin-password': localStorage.getItem('admin_pw') || '' } })
+      .then(r => r.blob()).then(blob => {
+        const a = document.createElement('a');
+        a.href = window.URL.createObjectURL(blob);
+        a.download = 'iphone-shop-db.csv';
+        a.click();
+      });
+  };
+
   async function loadPhones() {
     var r = await api('/api/phones');
     phones = await r.json();
     renderList();
+    updateStats();
+  }
+
+  function updateStats() {
+    var total = phones.length;
+    var views = phones.reduce((acc, p) => acc + (p.views || 0), 0);
+    var orders = phones.reduce((acc, p) => acc + (p.orders || 0), 0);
+    $('stat-total').textContent = total;
+    $('stat-views').textContent = views;
+    $('stat-orders').textContent = orders;
   }
 
   async function loadReviews() {
@@ -1994,6 +2063,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
             '<option value="available"' + (p.status==='available'?' selected':'') + '>В наличии</option>' +
             '<option value="reserved"'  + (p.status==='reserved' ?' selected':'') + '>Забронировано</option>' +
             '<option value="sold"'      + (p.status==='sold'     ?' selected':'') + '>Продано</option>' +
+            '<option value="draft"'     + (p.status==='draft'    ?' selected':'') + '>Черновик</option>' +
           '</select>' +
           '<button class="btn btn-secondary btn-sm" data-edit="' + p.id + '">Изменить</button>' +
           '<button class="btn btn-danger btn-sm" data-del="' + p.id + '">Удалить</button>' +
@@ -2054,6 +2124,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     
     var formData = Object.fromEntries(new FormData(addForm).entries());
     formData.is_hit = $('input-hit').checked;
+    formData.status = $('input-draft').checked ? 'draft' : 'available';
     
     var basePrice = Number(formData.base_price);
     var isDiscount = $('discount-checkbox').checked;
@@ -2110,6 +2181,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     toggleDiscount();
     $('percent-badge').style.display = 'none';
     $('input-hit').checked = false;
+    $('input-draft').checked = false;
   }
   cancelEditBtn.addEventListener('click', resetForm);
 
@@ -2132,6 +2204,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
       f.sim.value = p.sim || ''; f.imei.value = p.imei || '';
       f.description.value = p.description;
       $('input-hit').checked = p.is_hit || false;
+      $('input-draft').checked = p.status === 'draft';
       
       if (p.old_price && p.old_price > p.price) {
         f.base_price.value = p.old_price;
