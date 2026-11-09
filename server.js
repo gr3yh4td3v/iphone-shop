@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto'); // Добавили модуль для проверки подписи Telegram
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -117,10 +118,12 @@ const STATUSES = ['available', 'reserved', 'sold', 'draft'];
 
 // ---------- Auth ----------
 function auth(req, res, next) {
-  if (!process.env.ADMIN_PASSWORD || req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ ok: false, error: 'Неверный пароль' });
+  const token = req.headers['x-admin-password'];
+  // Пропускаем, если введен правильный пароль ИЛИ если это токен Telegram-авторизации
+  if (token === process.env.ADMIN_PASSWORD || token === 'telegram_auth_success') {
+    return next();
   }
-  next();
+  return res.status(401).json({ ok: false, error: 'Неверный пароль' });
 }
 
 // ============================================================
@@ -225,6 +228,26 @@ app.post('/api/order', async (req, res) => {
 app.post('/api/admin/login', (req, res) => {
   if (req.body.password === process.env.ADMIN_PASSWORD) return res.json({ ok: true });
   res.status(401).json({ ok: false, error: 'Неверный пароль' });
+});
+
+// Роут для проверки подписи Telegram
+app.get('/api/admin/auth/telegram', (req, res) => {
+  const { hash, ...data } = req.query;
+  
+  if (!hash) return res.status(400).send('Отсутствует подпись Telegram');
+
+  // Формируем строку для проверки согласно документации Telegram
+  const checkString = Object.keys(data).sort().map(key => `${key}=${data[key]}`).join('\n');
+  const secretKey = crypto.createHash('sha256').update(process.env.BOT_TOKEN).digest();
+  const hmac = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex');
+
+  // Проверяем подпись и то, что ID совпадает с твоим CHAT_ID
+  if (hmac === hash && String(data.id) === String(process.env.CHAT_ID)) {
+    // Если всё верно, редиректим обратно в админку с флагом успеха
+    res.redirect('/admin?telegram_auth=1');
+  } else {
+    res.status(401).send('Ошибка авторизации. Убедитесь, что вы владелец магазина.');
+  }
 });
 
 app.get('/api/admin/export', auth, (req, res) => {
@@ -359,7 +382,7 @@ app.delete('/api/admin/phones/:id', auth, (req, res) => {
 });
 
 // ============================================================
-//                     HTML PAGES (FRONTEND)
+//                     HTML PAGES
 // ============================================================
 
 const indexHTML = String.raw`<!DOCTYPE html>
@@ -371,31 +394,19 @@ const indexHTML = String.raw`<!DOCTYPE html>
 <link rel="icon" type="image/png" href="/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root { 
-    --bg: #fbfbfd; --card: #ffffff; --text: #1d1d1f; --muted: #86868b;
-    --border: #d2d2d7; --accent: #0071e3; --red: #ff3b30;
-  }
+  :root { --bg: #fbfbfd; --card: #ffffff; --text: #1d1d1f; --muted: #86868b; --border: #d2d2d7; --accent: #0071e3; --red: #ff3b30; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  
-  input[type=number]::-webkit-inner-spin-button, 
-  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   input[type=number] { -moz-appearance: textfield; }
-
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; border: 2px solid var(--bg); }
   ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-
-  body { 
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
-    background: var(--bg); color: var(--text); line-height: 1.5; 
-    -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100vh;
-  }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100vh; }
   .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; width: 100%; }
   
   header { background: rgba(251, 251, 253, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
   .header-inner { display: flex; align-items: center; justify-content: center; height: 72px; }
-  
   .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; cursor: default; display: flex; align-items: center; gap: 12px; }
   .logo img { height: 42px; width: auto; object-fit: contain; }
 
@@ -407,18 +418,15 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .filter { padding: 10px 24px; border-radius: 100px; border: 1px solid var(--border); background: transparent; color: var(--text); font-size: 15px; font-weight: 500; cursor: pointer; transition: all .2s; font-family: inherit; }
   .filter:hover { background: rgba(0,0,0,0.04); }
   .filter.active { background: var(--text); border-color: var(--text); color: #fff; }
-  
   .filter[data-status="discounted"] { color: var(--red); border-color: rgba(255,59,48,0.3); }
   .filter.active[data-status="discounted"] { background: var(--red); border-color: var(--red); color: #fff; }
   
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 32px; padding-bottom: 80px; }
   .card { background: var(--card); border-radius: 24px; overflow: hidden; border: 1px solid var(--border); transition: all .4s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; cursor: pointer; position: relative; }
   .card:hover { transform: translateY(-8px); box-shadow: 0 30px 60px rgba(0,0,0,0.08); border-color: transparent; }
-  
   .card.sold .card-img img { filter: grayscale(100%) opacity(0.7); }
   .card.sold .card-title { color: var(--muted); }
   .card.sold .price { color: var(--muted); }
-
   .card-img { aspect-ratio: 4/5; background: #f5f5f7; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .card-img img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s ease; }
   .card:hover .card-img img { transform: scale(1.04); }
@@ -428,17 +436,14 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .status.available { background: rgba(255, 255, 255, 0.95); color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
   .status.reserved  { background: rgba(255, 255, 255, 0.95); color: #b05e00; border: 1px solid rgba(176, 94, 0, 0.2); }
   .status.sold      { background: rgba(255, 255, 255, 0.95); color: #b0251f; border: 1px solid rgba(176, 37, 31, 0.2); }
-
   .hit-badge { position: absolute; top: 16px; left: 16px; background: var(--text); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-transform: uppercase; letter-spacing: 0.5px; }
   
   .card-body { padding: 28px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
   .card-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
   .card-meta { color: #515154; font-size: 15px; font-weight: 500; }
-  
   .trust-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px 0; }
   .trust-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); background: #f5f5f7; padding: 4px 8px; border-radius: 6px; font-weight: 500; }
   .trust-badge svg { width: 14px; height: 14px; color: #1a7f37; }
-
   .card-footer { display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto; padding-top: 12px; }
   
   .price-wrap { display: flex; flex-direction: column; gap: 2px; }
@@ -452,7 +457,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .btn { border: none; border-radius: 14px; padding: 12px 24px; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--text); color: #fff; transition: all .2s; font-family: inherit; white-space: nowrap; }
   .btn:hover:not(:disabled) { background: #000; transform: scale(1.02); }
   .btn:disabled { background: #e5e5ea; color: #86868b; cursor: not-allowed; transform: none; }
-  
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 18px; }
 
   .reviews-section { padding: 80px 0; background: #fff; border-top: 1px solid var(--border); }
@@ -462,10 +466,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .review-card { background: var(--bg); padding: 24px; border-radius: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
   .review-header { display: flex; justify-content: space-between; align-items: center; }
   .review-author { font-weight: 700; font-size: 16px; }
-  
   .stars-wrap { display: inline-flex; gap: 2px; color: #ffb400; }
   .stars-wrap svg { width: 16px; height: 16px; }
-
   .review-model { font-size: 13px; color: var(--accent); font-weight: 500; }
   .review-text { font-size: 14px; color: #444; line-height: 1.5; font-style: italic; }
   .review-date { font-size: 12px; color: var(--muted); margin-top: auto; }
@@ -473,7 +475,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-section { padding-bottom: 80px; display: none; }
   .recent-header { margin-bottom: 24px; }
   .recent-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
-  
   .recent-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scroll-snap-type: x mandatory; scroll-behavior: smooth; }
   .recent-grid::-webkit-scrollbar { height: 6px; }
   .recent-card { min-width: 240px; max-width: 240px; scroll-snap-align: start; }
@@ -491,36 +492,28 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .modal-overlay.open { display: flex; opacity: 1; }
   .modal { background: #fff; border-radius: 32px; width: 100%; animation: pop .4s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden; }
   @keyframes pop { from { transform: scale(0.95) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
-  
   .detail-modal { max-width: 1000px; display: flex; flex-direction: column; max-height: 90vh; }
   @media(min-width: 768px) { .detail-modal { flex-direction: row; } }
-  
   .detail-img-container { flex: 1.2; background: #f5f5f7; display: flex; flex-direction: column; min-height: 400px; }
   .detail-main-img { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
   .detail-main-img img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
   .detail-main-img svg { width: 120px; height: 120px; color: var(--border); }
-  
   .detail-thumbnails { display: flex; gap: 10px; padding: 16px; overflow-x: auto; background: #fff; border-top: 1px solid var(--border); }
   .detail-thumb { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 2px solid transparent; transition: border-color .2s; }
   .detail-thumb:hover, .detail-thumb.active { border-color: var(--accent); }
-
   .detail-content { flex: 1; padding: 48px; display: flex; flex-direction: column; overflow-y: auto; }
   .detail-close { position: absolute; top: 24px; right: 24px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0,0,0,0.05); color: var(--text); font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s; z-index: 10; }
   .detail-close:hover { background: rgba(0,0,0,0.1); }
   .detail-title { font-size: 32px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.03em; line-height: 1.2; }
   .detail-meta { color: var(--muted); font-size: 16px; margin-bottom: 32px; }
-  
   .specs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; background: #fbfbfd; padding: 24px; border-radius: 20px; border: 1px solid var(--border); }
   .spec-item { display: flex; flex-direction: column; gap: 4px; }
   .spec-label { font-size: 13px; color: var(--muted); font-weight: 500; }
   .spec-value { font-size: 15px; font-weight: 600; }
-  
   .detail-desc { font-size: 16px; color: #333; line-height: 1.6; margin-bottom: 32px; white-space: pre-wrap; }
-  
   .detail-trust-badges { display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap; }
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
-
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
   .detail-price-wrap { display: flex; flex-direction: column; }
   .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; }
@@ -530,31 +523,25 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
   .order-modal h2, .review-modal h2 { font-size: 28px; margin-bottom: 8px; font-weight: 800; letter-spacing: -0.02em; }
   .order-modal p, .review-modal p { color: var(--muted); font-size: 15px; margin-bottom: 24px; }
-  
   .deposit-note { font-size: 12px; color: #b05e00; background: #fff7ed; padding: 10px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffe8cc; display: flex; align-items: center; gap: 6px; }
   .deposit-note svg { width: 16px; height: 16px; }
-
   .input-group { margin-bottom: 20px; }
   .input-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
   .input-group input, .input-group textarea { width: 100%; padding: 16px; border: 1px solid var(--border); border-radius: 14px; font-size: 16px; font-family: inherit; outline: none; transition: border-color .2s; background: #fafafa; }
   .input-group input:focus, .input-group textarea:focus { border-color: var(--text); background: #fff; }
-  
   .star-rating { display: flex; gap: 8px; margin-top: 4px; }
   .star-rating .star { cursor: pointer; color: #d2d2d7; }
   .star-rating .star svg { width: 32px; height: 32px; fill: transparent; stroke: currentColor; stroke-width: 2; pointer-events: none; }
   .star-rating .star.active { color: #ffb400; }
   .star-rating .star.active svg { fill: #ffb400; stroke: #ffb400; }
-
   .order-modal .btn, .review-modal .btn { width: 100%; margin-top: 8px; padding: 18px; font-size: 17px; }
   .modal-msg { margin-top: 20px; padding: 14px; border-radius: 12px; font-size: 15px; text-align: center; display: none; font-weight: 500; }
   .modal-msg.ok { display: block; background: #e8f5e9; color: #1a7f37; }
   .modal-msg.err { display: block; background: #ffebee; color: #b0251f; }
-
   .info-modal { max-width: 500px; padding: 40px; }
   .info-modal h2 { font-size: 24px; margin-bottom: 24px; font-weight: 800; letter-spacing: -0.02em; }
   .info-modal #info-text { margin-bottom: 24px; }
   .info-modal .btn { width: 100%; }
-  
   .faq-item { margin-bottom: 20px; }
   .faq-item:last-child { margin-bottom: 0; }
   .faq-q { font-weight: 700; font-size: 16px; margin-bottom: 6px; color: var(--text); }
@@ -575,13 +562,11 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .search-box input { width: 100%; padding: 14px 16px 14px 44px; border-radius: 100px; border: 1px solid var(--border); font-size: 15px; outline: none; transition: all .2s; background: var(--card); font-family: inherit; }
   .search-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,0.1); }
   .search-box svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); }
-
   .custom-select { position: relative; user-select: none; min-width: 220px; }
   .custom-select-btn { width: 100%; padding: 14px 44px 14px 20px; border-radius: 100px; border: 1px solid var(--border); background: var(--card); font-size: 15px; font-weight: 500; font-family: inherit; color: var(--text); text-align: left; cursor: pointer; outline: none; transition: all .2s; display: flex; align-items: center; justify-content: space-between; }
   .custom-select-btn:hover { background: #f9f9fb; }
   .custom-select-btn svg { width: 16px; height: 16px; color: var(--muted); transition: transform .3s; position: absolute; right: 20px; }
   .custom-select-btn.open svg { transform: rotate(180deg); }
-  
   .custom-select-options { position: absolute; top: calc(100% + 8px); left: 0; width: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.1); opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all .3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 10; padding: 8px; }
   .custom-select-options.open { opacity: 1; visibility: visible; transform: translateY(0); }
   .custom-option { padding: 12px 16px; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; transition: background .2s; color: var(--text); }
@@ -1520,6 +1505,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .login-box input { width:100%; padding:14px 16px; border:1px solid var(--border); background:#fafafa; border-radius:12px; font-size:15px; margin-bottom:16px; font-family:inherit; outline:none; transition:border-color .2s; }
   .login-box input:focus { border-color:var(--text); background:#fff; }
   .login-err { color:var(--red); font-size:13px; text-align:center; margin-top:12px; min-height:20px; }
+  .tg-widget-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
   
   .app { display:none; }
   .app.visible { display:block; }
@@ -1733,13 +1719,29 @@ const adminHTML = String.raw`<!DOCTYPE html>
 <body>
 
 <div class="login-screen" id="login-screen">
-  <form class="login-box" id="login-form">
+  <div class="login-box">
     <h1>Админ-панель</h1>
-    <p>Введите пароль для управления витриной</p>
-    <input type="password" id="password" placeholder="Пароль" required autocomplete="current-password">
-    <button type="submit" class="btn" style="width:100%; padding:16px; font-size:16px;">Войти</button>
+    <p>Войдите с помощью Telegram или введите пароль</p>
+    
+    <!-- Виджет Telegram -->
+    <div class="tg-widget-wrap">
+      <script async src="https://telegram.org/js/telegram-widget.js?22" 
+        data-telegram-login="ShopysiPhonesBot" 
+        data-size="large" 
+        data-radius="12" 
+        data-auth-url="https://iphone-shop.up.railway.app/api/admin/auth/telegram" 
+        data-request-access="write">
+      </script>
+    </div>
+
+    <div style="text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 20px;">— или —</div>
+
+    <form id="login-form">
+      <input type="password" id="password" placeholder="Пароль" required autocomplete="current-password">
+      <button type="submit" class="btn" style="width:100%; padding:16px; font-size:16px;">Войти</button>
+    </form>
     <div class="login-err" id="login-err"></div>
-  </form>
+  </div>
 </div>
 
 <div class="app" id="app">
@@ -2071,6 +2073,19 @@ const adminHTML = String.raw`<!DOCTYPE html>
     localStorage.removeItem('admin_pw');
     location.reload();
   };
+
+  // Проверка параметров URL после редиректа от Telegram
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('telegram_auth') === '1') {
+    localStorage.setItem('admin_pw', 'telegram_auth_success');
+    window.history.replaceState({}, document.title, "/admin");
+    showApp();
+  } else if (localStorage.getItem('admin_pw')) {
+    api('/api/phones').then(function(r) {
+      if (r.ok) showApp();
+      else localStorage.removeItem('admin_pw');
+    });
+  }
 
   window.exportCSV = function() {
     fetch('/api/admin/export', { headers: { 'x-admin-password': localStorage.getItem('admin_pw') || '' } })
