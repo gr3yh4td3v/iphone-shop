@@ -1513,14 +1513,14 @@ const adminHTML = String.raw`<!DOCTYPE html>
   
   .login-err { color:var(--red); font-size:13px; text-align:center; margin-top:12px; min-height:20px; }
   
-  /* Контейнер для кнопки Telegram с анимацией */
+  /* Контейнер для кнопки Telegram */
   .tg-widget-wrap { 
     display: flex; 
     justify-content: center; 
     margin-bottom: 20px; 
     border-radius: 12px; 
     overflow: hidden; 
-    background: #54a9eb; 
+    background: #54a9eb; /* Синий цвет Telegram, чтобы скрыть черные углы */
     width: fit-content;
     margin-left: auto;
     margin-right: auto;
@@ -1533,8 +1533,10 @@ const adminHTML = String.raw`<!DOCTYPE html>
   }
   .tg-widget-wrap iframe {
     display: block;
-    border-radius: 0 !important;
     border: none !important;
+    /* Убираем черные углы через жесткое обрезание */
+    clip-path: inset(0 0 0 0 round 12px) !important;
+    border-radius: 12px !important;
   }
   
   /* Красивый разделитель */
@@ -1759,12 +1761,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
     <h1>Админ-панель</h1>
     <p>Войдите с помощью Telegram или введите пароль</p>
 
-    <!-- Анимированная кнопка Telegram -->
+    <!-- Кнопка Telegram с фиксом черных углов -->
     <div class="tg-widget-wrap">
       <script async src="https://telegram.org/js/telegram-widget.js?22" 
         data-telegram-login="ShopysiPhonesBot" 
         data-size="large" 
-        data-radius="12" 
+        data-radius="0" 
         data-userpic="false" 
         data-auth-url="https://iphone-shop.up.railway.app/api/admin/auth/telegram" 
         data-request-access="write">
