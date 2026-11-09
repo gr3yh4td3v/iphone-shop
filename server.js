@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto'); // Добавили модуль для проверки подписи Telegram
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1504,6 +1504,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
   
   /* Контейнер для кнопки Telegram */
   .tg-widget-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
+  /* Исправление черных углов */
+  .tg-widget-wrap iframe {
+    border-radius: 12px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
   
   .app { display:none; }
   .app.visible { display:block; }
@@ -1721,12 +1727,11 @@ const adminHTML = String.raw`<!DOCTYPE html>
     <h1>Админ-панель</h1>
     <p>Войдите с помощью Telegram или введите пароль</p>
 
-    <!-- Красивая кнопка входа через Telegram (скрыли аватарку) -->
+    <!-- Красивая кнопка входа через Telegram (скрыли аватарку, убрали data-radius) -->
     <div class="tg-widget-wrap">
       <script async src="https://telegram.org/js/telegram-widget.js?22" 
         data-telegram-login="ShopysiPhonesBot" 
         data-size="large" 
-        data-radius="12" 
         data-userpic="false" 
         data-auth-url="https://iphone-shop.up.railway.app/api/admin/auth/telegram" 
         data-request-access="write">
