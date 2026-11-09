@@ -119,7 +119,6 @@ const STATUSES = ['available', 'reserved', 'sold', 'draft'];
 // ---------- Auth ----------
 function auth(req, res, next) {
   const token = req.headers['x-admin-password'];
-  // Пропускаем, если введен правильный пароль ИЛИ если это токен Telegram-авторизации
   if (token === process.env.ADMIN_PASSWORD || token === 'telegram_auth_success') {
     return next();
   }
@@ -236,14 +235,11 @@ app.get('/api/admin/auth/telegram', (req, res) => {
   
   if (!hash) return res.status(400).send('Отсутствует подпись Telegram');
 
-  // Формируем строку для проверки согласно документации Telegram
   const checkString = Object.keys(data).sort().map(key => `${key}=${data[key]}`).join('\n');
   const secretKey = crypto.createHash('sha256').update(process.env.BOT_TOKEN).digest();
   const hmac = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex');
 
-  // Проверяем подпись и то, что ID совпадает с твоим CHAT_ID
   if (hmac === hash && String(data.id) === String(process.env.CHAT_ID)) {
-    // Если всё верно, редиректим обратно в админку с флагом успеха
     res.redirect('/admin?telegram_auth=1');
   } else {
     res.status(401).send('Ошибка авторизации. Убедитесь, что вы владелец магазина.');
@@ -1505,6 +1501,8 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .login-box input { width:100%; padding:14px 16px; border:1px solid var(--border); background:#fafafa; border-radius:12px; font-size:15px; margin-bottom:16px; font-family:inherit; outline:none; transition:border-color .2s; }
   .login-box input:focus { border-color:var(--text); background:#fff; }
   .login-err { color:var(--red); font-size:13px; text-align:center; margin-top:12px; min-height:20px; }
+  
+  /* Контейнер для кнопки Telegram */
   .tg-widget-wrap { display: flex; justify-content: center; margin-bottom: 20px; }
   
   .app { display:none; }
@@ -1722,13 +1720,14 @@ const adminHTML = String.raw`<!DOCTYPE html>
   <div class="login-box">
     <h1>Админ-панель</h1>
     <p>Войдите с помощью Telegram или введите пароль</p>
-    
-    <!-- Виджет Telegram -->
+
+    <!-- Красивая кнопка входа через Telegram (скрыли аватарку) -->
     <div class="tg-widget-wrap">
       <script async src="https://telegram.org/js/telegram-widget.js?22" 
         data-telegram-login="ShopysiPhonesBot" 
         data-size="large" 
         data-radius="12" 
+        data-userpic="false" 
         data-auth-url="https://iphone-shop.up.railway.app/api/admin/auth/telegram" 
         data-request-access="write">
       </script>
