@@ -55,6 +55,45 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const STATUSES = ['available', 'reserved', 'sold'];
 
+async function postToChannel(phone) {
+  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
+  
+  const siteUrl = 'https://iphone-shop.up.railway.app';
+  const caption = `🔥 <b>Новое поступление!</b>\n\n` +
+                  `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
+                  `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}\n` +
+                  `🔋 АКБ: ${esc(phone.battery) || '—'}%\n` +
+                  `💰 Цена: <b>${Number(phone.price).toLocaleString('ru-RU')} ₽</b>\n\n` +
+                  `👉 <a href="${siteUrl}">Смотреть на сайте</a>`;
+
+  try {
+    if (phone.images && phone.images.length > 0) {
+      await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: process.env.CHANNEL_ID,
+          photo: phone.images[0],
+          caption: caption,
+          parse_mode: 'HTML'
+        })
+      });
+    } else {
+      await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: process.env.CHANNEL_ID,
+          text: caption,
+          parse_mode: 'HTML'
+        })
+      });
+    }
+  } catch (e) {
+    console.error('Ошибка автопостинга в канал:', e);
+  }
+}
+
 // ---------- Auth ----------
 function auth(req, res, next) {
   if (!process.env.ADMIN_PASSWORD || req.headers['x-admin-password'] !== process.env.ADMIN_PASSWORD) {
@@ -229,6 +268,10 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   writeDB(db);
 
   await notify(`➕ <b>Добавлен товар</b>\n📱 ${esc(brand)} ${esc(model)}\n💰 Цена: ${Number(price).toLocaleString('ru-RU')} ₽`);
+  
+  // Вызов автопостинга в канал
+  await postToChannel(phone);
+
   res.json({ ok: true, id: phone.id });
 });
 
@@ -457,7 +500,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .input-group input, .input-group textarea { width: 100%; padding: 16px; border: 1px solid var(--border); border-radius: 14px; font-size: 16px; font-family: inherit; outline: none; transition: border-color .2s; background: #fafafa; }
   .input-group input:focus, .input-group textarea:focus { border-color: var(--text); background: #fff; }
   
-  /* КРАСИВЫЙ РЕЙТИНГ ЗВЕЗДАМИ (БЕЗ ГЛЮКОВ) */
   .star-rating { display: flex; gap: 8px; margin-top: 4px; }
   .star-rating .star { cursor: pointer; color: #d2d2d7; }
   .star-rating .star svg { width: 32px; height: 32px; fill: transparent; stroke: currentColor; stroke-width: 2; pointer-events: none; }
@@ -489,7 +531,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .footer-col a:hover { color: var(--text); }
   .footer-bottom { border-top: 1px solid var(--border); padding-top: 32px; display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
 
-  /* Controls (Search & Custom Sort) */
   .controls-row { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap; }
   
   .search-box { position: relative; max-width: 400px; width: 100%; }
@@ -497,7 +538,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .search-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,0.1); }
   .search-box svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); }
 
-  /* Кастомный выпадающий список (в стиле Apple) */
   .custom-select { position: relative; user-select: none; min-width: 220px; }
   .custom-select-btn { width: 100%; padding: 14px 44px 14px 20px; border-radius: 100px; border: 1px solid var(--border); background: var(--card); font-size: 15px; font-weight: 500; font-family: inherit; color: var(--text); text-align: left; cursor: pointer; outline: none; transition: all .2s; display: flex; align-items: center; justify-content: space-between; }
   .custom-select-btn:hover { background: #f9f9fb; }
@@ -989,7 +1029,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var now = new Date().getTime();
     var list = allPhones.slice();
 
-    // Фильтр по статусу
     if (currentFilter === 'discounted') {
       list = list.filter(function(p) {
         var isDiscounted = p.old_price && p.old_price > p.price;
@@ -1001,7 +1040,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
       list = list.filter(function(p) { return p.status === currentFilter; });
     }
 
-    // Поиск
     if (currentSearch) {
       var q = currentSearch.toLowerCase();
       list = list.filter(function(p) {
@@ -1009,7 +1047,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
       });
     }
 
-    // Сортировка
     if (currentSort === 'price-asc') {
       list.sort(function(a, b) { return a.price - b.price; });
     } else if (currentSort === 'price-desc') {
