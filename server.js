@@ -5,7 +5,7 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'shop.json');
+const DB_FILE = '/data/shop.json';
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(__dirname));
@@ -2012,7 +2012,7 @@ app.get('/', (req, res) => res.type('html').send(indexHTML));
 app.get('/admin', (req, res) => res.type('html').send(adminHTML));
 app.get('/admin.html', (req, res) => res.type('html').send(adminHTML));
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('  iPhone | Shop запущен');
   console.log('  Витрина:  http://localhost:' + PORT);
