@@ -489,17 +489,27 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .footer-col a:hover { color: var(--text); }
   .footer-bottom { border-top: 1px solid var(--border); padding-top: 32px; display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; }
 
-  /* Controls (Search, Sort, Brands) */
-  .controls-row { display: flex; gap: 16px; justify-content: center; margin-bottom: 24px; flex-wrap: wrap; }
+  /* Controls (Search & Custom Sort) */
+  .controls-row { display: flex; gap: 16px; justify-content: center; margin-bottom: 32px; flex-wrap: wrap; }
+  
   .search-box { position: relative; max-width: 400px; width: 100%; }
-  .search-box input { width: 100%; padding: 12px 16px 12px 40px; border-radius: 100px; border: 1px solid var(--border); font-size: 15px; outline: none; transition: border-color .2s; background: var(--card); font-family: inherit; }
-  .search-box input:focus { border-color: var(--accent); }
-  .search-box svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); }
-  .sort-select { padding: 12px 32px 12px 16px; border-radius: 100px; border: 1px solid var(--border); font-size: 15px; outline: none; background: var(--card); cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; background-size: 14px; font-family: inherit; font-weight: 500; color: var(--text); }
-  .brand-filters { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 32px; }
-  .brand-filter { padding: 8px 16px; border-radius: 100px; border: 1px solid var(--border); background: transparent; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .2s; font-family: inherit; color: var(--text); }
-  .brand-filter:hover { background: rgba(0,0,0,0.04); }
-  .brand-filter.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .search-box input { width: 100%; padding: 14px 16px 14px 44px; border-radius: 100px; border: 1px solid var(--border); font-size: 15px; outline: none; transition: all .2s; background: var(--card); font-family: inherit; }
+  .search-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,0.1); }
+  .search-box svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); }
+
+  /* Кастомный выпадающий список (в стиле Apple) */
+  .custom-select { position: relative; user-select: none; min-width: 220px; }
+  .custom-select-btn { width: 100%; padding: 14px 44px 14px 20px; border-radius: 100px; border: 1px solid var(--border); background: var(--card); font-size: 15px; font-weight: 500; font-family: inherit; color: var(--text); text-align: left; cursor: pointer; outline: none; transition: all .2s; display: flex; align-items: center; justify-content: space-between; }
+  .custom-select-btn:hover { background: #f9f9fb; }
+  .custom-select-btn svg { width: 16px; height: 16px; color: var(--muted); transition: transform .3s; position: absolute; right: 20px; }
+  .custom-select-btn.open svg { transform: rotate(180deg); }
+  
+  .custom-select-options { position: absolute; top: calc(100% + 8px); left: 0; width: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.1); opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all .3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 10; padding: 8px; }
+  .custom-select-options.open { opacity: 1; visibility: visible; transform: translateY(0); }
+  
+  .custom-option { padding: 12px 16px; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; transition: background .2s; color: var(--text); }
+  .custom-option:hover { background: #f5f5f7; }
+  .custom-option.active { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
   
   @media (max-width: 768px) {
     .grid { grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -518,6 +528,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .logo img { height: 32px; }
     .logo span { font-size: 18px; }
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+    .controls-row { flex-direction: column; align-items: stretch; }
+    .custom-select { min-width: 100%; }
   }
 </style>
 </head>
@@ -547,15 +559,20 @@ const indexHTML = String.raw`<!DOCTYPE html>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         <input type="text" id="search-input" placeholder="Поиск по модели...">
       </div>
-      <select class="sort-select" id="sort-select">
-        <option value="default">По умолчанию</option>
-        <option value="price-asc">Сначала дешевые</option>
-        <option value="price-desc">Сначала дорогие</option>
-        <option value="newest">Сначала новые</option>
-      </select>
+      
+      <div class="custom-select" id="sort-select-wrapper">
+        <button class="custom-select-btn" id="sort-select-btn">
+          <span id="sort-selected-text">По умолчанию</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="custom-select-options" id="sort-options">
+          <div class="custom-option active" data-value="default">По умолчанию</div>
+          <div class="custom-option" data-value="price-asc">Сначала дешевые</div>
+          <div class="custom-option" data-value="price-desc">Сначала дорогие</div>
+          <div class="custom-option" data-value="newest">Сначала новые</div>
+        </div>
+      </div>
     </div>
-    
-    <div class="brand-filters" id="brand-filters"></div>
 
     <div class="filters" id="filters">
       <button class="filter active" data-status="all">Все</button>
@@ -750,7 +767,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   var STATUS_BTN   = { available:'Забронировать', reserved:'Узнать', sold:'Уведомить' };
   var allPhones = [];
   var currentFilter = 'all';
-  var currentBrand = 'all';
   var currentSearch = '';
   var currentSort = 'default';
   var selectedPhone = null;
@@ -774,7 +790,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
   var phoneSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>';
 
-  // Логика звездного рейтинга на JS (без глюков CSS)
+  // Логика звездного рейтинга на JS
   var stars = document.querySelectorAll('#star-rating .star');
   var ratingInput = document.getElementById('rating-input');
 
@@ -861,7 +877,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   function load() {
     fetch('/api/phones').then(function(r) { return r.json(); }).then(function(data) {
       allPhones = data; 
-      renderBrands();
       render(); 
       renderRecent();
     }).catch(function() {
@@ -970,21 +985,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     '</article>';
   }
 
-  function renderBrands() {
-    var brands = [];
-    allPhones.forEach(function(p) {
-      if (p.brand && brands.indexOf(p.brand) === -1) brands.push(p.brand);
-    });
-    var container = document.getElementById('brand-filters');
-    if (brands.length === 0) { container.innerHTML = ''; return; }
-    
-    var html = '<button class="brand-filter ' + (currentBrand === 'all' ? 'active' : '') + '" data-brand="all">Все бренды</button>';
-    brands.forEach(function(b) {
-      html += '<button class="brand-filter ' + (currentBrand === b ? 'active' : '') + '" data-brand="' + esc(b) + '">' + esc(b) + '</button>';
-    });
-    container.innerHTML = html;
-  }
-
   function render() {
     var now = new Date().getTime();
     var list = allPhones.slice();
@@ -999,11 +999,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
       });
     } else if (currentFilter !== 'all') {
       list = list.filter(function(p) { return p.status === currentFilter; });
-    }
-
-    // Фильтр по бренду
-    if (currentBrand !== 'all') {
-      list = list.filter(function(p) { return p.brand === currentBrand; });
     }
 
     // Поиск
@@ -1340,17 +1335,36 @@ const indexHTML = String.raw`<!DOCTYPE html>
     render();
   });
 
-  document.getElementById('sort-select').addEventListener('change', function(e) {
-    currentSort = e.target.value;
-    render();
+  // Кастомный выпадающий список
+  var sortBtn = document.getElementById('sort-select-btn');
+  var sortOptions = document.getElementById('sort-options');
+  var sortSelectedText = document.getElementById('sort-selected-text');
+
+  sortBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    sortBtn.classList.toggle('open');
+    sortOptions.classList.toggle('open');
   });
 
-  document.getElementById('brand-filters').addEventListener('click', function(e) {
-    var btn = e.target.closest('.brand-filter');
-    if (!btn) return;
-    currentBrand = btn.dataset.brand;
-    renderBrands();
+  document.addEventListener('click', function() {
+    sortBtn.classList.remove('open');
+    sortOptions.classList.remove('open');
+  });
+
+  sortOptions.addEventListener('click', function(e) {
+    var option = e.target.closest('.custom-option');
+    if (!option) return;
+    
+    sortOptions.querySelectorAll('.custom-option').forEach(function(el) { el.classList.remove('active'); });
+    option.classList.add('active');
+    
+    sortSelectedText.textContent = option.textContent;
+    currentSort = option.dataset.value;
+    
     render();
+    
+    sortBtn.classList.remove('open');
+    sortOptions.classList.remove('open');
   });
 
   load();
