@@ -127,7 +127,6 @@ function auth(req, res, next) {
 //                         PUBLIC API
 // ============================================================
 app.get('/api/phones', (req, res) => {
-  // На сайт отдаем только те товары, которые не в черновике
   const phones = readDB().phones.filter(p => p.status !== 'draft');
   res.json(phones);
 });
@@ -228,18 +227,17 @@ app.post('/api/admin/login', (req, res) => {
   res.status(401).json({ ok: false, error: 'Неверный пароль' });
 });
 
-// Экспорт базы в CSV
 app.get('/api/admin/export', auth, (req, res) => {
   const db = readDB();
   let csv = 'ID;Бренд;Модель;Цена;Просмотры;Заявки;Статус;Дата\n';
   db.phones.forEach(p => {
-    const clean = (s) => `"${String(s || '').replace(/"/g, '""')}"`;
+    const clean = (s) => '"' + String(s || '').replace(/"/g, '""') + '"';
     csv += `${p.id};${clean(p.brand)};${clean(p.model)};${p.price};${p.views||0};${p.orders||0};${p.status};${clean(new Date(p.created_at).toLocaleString('ru-RU'))}\n`;
   });
   
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="iphone-shop-db.csv"');
-  res.send('\uFEFF' + csv); // BOM для корректного открытия в Excel
+  res.send('\uFEFF' + csv);
 });
 
 app.get('/api/admin/reviews', auth, (req, res) => {
@@ -345,7 +343,6 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
 
     await notify(msg);
 
-    // Если товар вытащили из черновика в наличие, публикуем в канал
     if (updated.status === 'available' && prev.status === 'draft') {
       await postToChannel(updated);
     }
@@ -458,7 +455,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 18px; }
 
-  /* Отзывы */
   .reviews-section { padding: 80px 0; background: #fff; border-top: 1px solid var(--border); }
   .reviews-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
   .reviews-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; }
@@ -474,7 +470,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .review-text { font-size: 14px; color: #444; line-height: 1.5; font-style: italic; }
   .review-date { font-size: 12px; color: var(--muted); margin-top: auto; }
 
-  /* Недавно просмотренные */
   .recent-section { padding-bottom: 80px; display: none; }
   .recent-header { margin-bottom: 24px; }
   .recent-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
@@ -589,7 +584,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   
   .custom-select-options { position: absolute; top: calc(100% + 8px); left: 0; width: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 10px 40px rgba(0,0,0,0.1); opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all .3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 10; padding: 8px; }
   .custom-select-options.open { opacity: 1; visibility: visible; transform: translateY(0); }
-  
   .custom-option { padding: 12px 16px; border-radius: 10px; font-size: 15px; font-weight: 500; cursor: pointer; transition: background .2s; color: var(--text); }
   .custom-option:hover { background: #f5f5f7; }
   .custom-option.active { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
@@ -680,7 +674,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Блок Отзывов -->
   <section class="reviews-section" id="reviews-section" style="display: none;">
     <div class="container">
       <div class="reviews-header">
@@ -1550,7 +1543,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .btn-success:hover { background:#c8e6c9; }
   
   /* Dashboard */
-  .dashboard { display: flex; gap: 20px; margin-bottom: 32px; }
+  .dashboard { display: flex; gap: 20px; margin-bottom: 40px; }
   .stat-card { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid var(--border); flex: 1; font-size: 14px; color: var(--muted); display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
   .stat-card span { display: block; font-size: 28px; font-weight: 800; color: var(--text); margin-top: 4px; }
   .dashboard-actions { display: flex; align-items: center; }
@@ -1563,7 +1556,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .tab-content { display: none; }
   .tab-content.active { display: block; }
 
-  main { padding:40px 0 80px; }
+  main { padding: 60px 0 80px; }
   .page-title { font-size:32px; font-weight:800; margin-bottom:32px; letter-spacing:-0.03em; }
   
   .form-card { background:#fff; border-radius:24px; padding:40px; border:1px solid var(--border); margin-bottom:48px; box-shadow:0 4px 20px rgba(0,0,0,0.02); }
@@ -1631,17 +1624,14 @@ const adminHTML = String.raw`<!DOCTYPE html>
 
   .admin-hit-badge { background: var(--text); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
 
-  .status-select {
-    padding: 10px 14px; padding-right: 32px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; outline: none; transition: all .2s;
-    -webkit-appearance: none; -moz-appearance: none; appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 10px center; background-size: 12px;
-  }
+  .status-select { display: none; } /* Скрываем нативный селект */
+  .custom-select-trigger.status-trigger { padding: 10px 14px; padding-right: 32px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; outline: none; transition: all .2s; background-image: none; justify-content: space-between; }
+  .custom-select-trigger.status-trigger svg { width: 12px; height: 12px; }
+  .custom-select-trigger.status-trigger.available { color:#1a7f37; border-color:#cce8d5; background-color:#f0fdf4; }
+  .custom-select-trigger.status-trigger.reserved  { color:#b05e00; border-color:#ffe8cc; background-color:#fff7ed; }
+  .custom-select-trigger.status-trigger.sold      { color:#b0251f; border-color:#fecdd3; background-color:#fef2f2; }
+  .custom-select-trigger.status-trigger.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
   
-  .status-select.available { color:#1a7f37; border-color:#cce8d5; background-color:#f0fdf4; }
-  .status-select.reserved  { color:#b05e00; border-color:#ffe8cc; background-color:#fff7ed; }
-  .status-select.sold      { color:#b0251f; border-color:#fecdd3; background-color:#fef2f2; }
-  .status-select.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
   .empty { text-align:center; padding:60px 20px; color:var(--muted); font-size:16px; }
 
   .discount-toggle-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; cursor: pointer; padding: 10px; background: #fafafa; border-radius: 10px; border: 1px solid var(--border); transition: background .2s; }
@@ -1656,7 +1646,20 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .hit-checkbox-wrap { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 14px 16px; background: #fafafa; border-radius: 12px; border: 1px solid var(--border); transition: background .2s; }
   .hit-checkbox-wrap:hover { background: #f5f5f7; }
   .hit-checkbox-wrap input[type=checkbox] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--text); }
-  .hit-checkbox-wrap label { margin: 0; cursor: pointer; font-size: 15px; font-weight: 500; }
+  .hit-checkbox-wrap label { margin: 0; cursor: pointer; font-size: 15px; font-weight: 500; display: flex; align-items: center; }
+
+  /* Стили для кастомного селекта */
+  .custom-select-wrapper { position: relative; user-select: none; width: 100%; }
+  .custom-select-trigger { width: 100%; padding: 14px 16px; padding-right: 44px; border: 1px solid var(--border); background-color: #fafafa; border-radius: 12px; font-size: 15px; font-family: inherit; outline: none; transition: border-color .2s; cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; color: var(--text); }
+  .custom-select-trigger:hover { background-color: #f5f5f7; }
+  .custom-select-trigger.open { border-color: var(--text); background-color: #fff; }
+  .custom-select-trigger svg { width: 16px; height: 16px; color: var(--muted); transition: transform .3s; }
+  .custom-select-trigger.open svg { transform: rotate(180deg); }
+  .custom-select-options { position: absolute; top: calc(100% + 4px); left: 0; width: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.1); opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all .2s; z-index: 50; padding: 8px; max-height: 250px; overflow-y: auto; }
+  .custom-select-options.open { opacity: 1; visibility: visible; transform: translateY(0); }
+  .custom-select-option { padding: 10px 14px; border-radius: 8px; font-size: 15px; cursor: pointer; transition: background .2s; color: var(--text); }
+  .custom-select-option:hover { background: #f5f5f7; }
+  .custom-select-option.selected { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
 
   @media (max-width:720px) {
     .dashboard { flex-direction: column; }
@@ -1699,13 +1702,22 @@ const adminHTML = String.raw`<!DOCTYPE html>
   </header>
   <main class="container">
     
+    <h1 class="page-title">Управление магазином</h1>
+
     <!-- ДАШБОРД -->
     <div class="dashboard">
       <div class="stat-card">Всего товаров <span id="stat-total">0</span></div>
       <div class="stat-card">Всего просмотров <span id="stat-views">0</span></div>
       <div class="stat-card">Всего заявок <span id="stat-orders">0</span></div>
       <div class="dashboard-actions">
-        <button class="btn" style="height: 100%; font-size: 15px;" onclick="exportCSV()">📥 Скачать базу (CSV)</button>
+        <button class="btn" style="height: 100%; font-size: 15px;" onclick="exportCSV()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: middle;">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Скачать базу (CSV)
+        </button>
       </div>
     </div>
 
@@ -1813,14 +1825,28 @@ const adminHTML = String.raw`<!DOCTYPE html>
           <div class="full">
             <div class="hit-checkbox-wrap">
               <input type="checkbox" id="input-hit" name="is_hit">
-              <label for="input-hit">🔥 Отметить как «ХИТ ПРОДАЖ»</label>
+              <label for="input-hit">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff9500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+                  <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path>
+                </svg>
+                Отметить как «ХИТ ПРОДАЖ»
+              </label>
             </div>
           </div>
 
           <div class="full">
             <div class="hit-checkbox-wrap" style="background:#f5f5f5; border-color:#ccc;">
               <input type="checkbox" id="input-draft" name="is_draft">
-              <label for="input-draft">📝 Сохранить как «Черновик» (не будет виден на сайте)</label>
+              <label for="input-draft">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#86868b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Сохранить как «Черновик» (не будет виден на сайте)
+              </label>
             </div>
           </div>
 
@@ -1984,6 +2010,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     $('login-screen').style.display = 'none';
     $('app').classList.add('visible');
     loadPhones();
+    initCustomSelects(); // Инициализация селектов в форме
   }
   window.logout = function() {
     localStorage.removeItem('admin_pw');
@@ -2071,6 +2098,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
       '</div>';
     }
     list.innerHTML = html;
+    initCustomSelects(); // Инициализация селектов в списке товаров
   }
 
   function renderReviews() {
@@ -2109,6 +2137,84 @@ const adminHTML = String.raw`<!DOCTYPE html>
       '</div>';
     }
     list.innerHTML = html;
+  }
+
+  // Функция для превращения нативных селектов в красивые
+  function initCustomSelects() {
+    document.querySelectorAll('select:not(.customized)').forEach(select => {
+      select.classList.add('customized');
+      select.style.display = 'none'; // Скрываем нативный селект
+      
+      const wrapper = document.createElement('div');
+      wrapper.className = 'custom-select-wrapper';
+      
+      const trigger = document.createElement('div');
+      trigger.className = 'custom-select-trigger';
+      
+      // Если это селект статуса, добавляем ему классы для цветов
+      if (select.classList.contains('status-select')) {
+        trigger.classList.add('status-trigger');
+        trigger.classList.add(select.classList[1] || 'available');
+      }
+      
+      const selectedText = select.options[select.selectedIndex].text;
+      trigger.innerHTML = '<span>' + selectedText + '</span>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+      
+      const optionsContainer = document.createElement('div');
+      optionsContainer.className = 'custom-select-options';
+      
+      Array.from(select.options).forEach(option => {
+        const optDiv = document.createElement('div');
+        optDiv.className = 'custom-select-option' + (option.selected ? ' selected' : '');
+        optDiv.textContent = option.text;
+        optDiv.dataset.value = option.value;
+        
+        optDiv.addEventListener('click', (e) => {
+          e.stopPropagation();
+          select.value = option.value;
+          trigger.querySelector('span').textContent = option.text;
+          
+          if (select.classList.contains('status-select')) {
+            trigger.className = 'custom-select-trigger status-trigger ' + option.value;
+          }
+          
+          optionsContainer.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('selected'));
+          optDiv.classList.add('selected');
+          
+          trigger.classList.remove('open');
+          optionsContainer.classList.remove('open');
+          
+          select.dispatchEvent(new Event('change')); // Вызываем стандартное событие
+        });
+        
+        optionsContainer.appendChild(optDiv);
+      });
+      
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.custom-select-trigger.open').forEach(t => {
+          if (t !== trigger) {
+            t.classList.remove('open');
+            if (t.nextElementSibling) t.nextElementSibling.classList.remove('open');
+          }
+        });
+        trigger.classList.toggle('open');
+        optionsContainer.classList.toggle('open');
+      });
+      
+      wrapper.appendChild(trigger);
+      wrapper.appendChild(optionsContainer);
+      select.parentNode.insertBefore(wrapper, select.nextSibling);
+    });
+    
+    if (!window.customSelectListenerAdded) {
+      document.addEventListener('click', () => {
+        document.querySelectorAll('.custom-select-trigger').forEach(t => t.classList.remove('open'));
+        document.querySelectorAll('.custom-select-options').forEach(o => o.classList.remove('open'));
+      });
+      window.customSelectListenerAdded = true;
+    }
   }
 
   var addForm = $('add-form');
@@ -2182,6 +2288,16 @@ const adminHTML = String.raw`<!DOCTYPE html>
     $('percent-badge').style.display = 'none';
     $('input-hit').checked = false;
     $('input-draft').checked = false;
+    
+    // Сброс кастомных селектов
+    addForm.querySelectorAll('.custom-select-wrapper').forEach(wrapper => {
+      const select = wrapper.previousElementSibling;
+      if (select && select.tagName === 'SELECT') {
+        select.selectedIndex = 0;
+        const trigger = wrapper.querySelector('.custom-select-trigger');
+        trigger.querySelector('span').textContent = select.options[0].text;
+      }
+    });
   }
   cancelEditBtn.addEventListener('click', resetForm);
 
@@ -2198,10 +2314,30 @@ const adminHTML = String.raw`<!DOCTYPE html>
       cancelEditBtn.style.display = 'inline-block';
       var f = addForm.elements;
       f.brand.value = p.brand; f.model.value = p.model;
-      f.storage.value = p.storage; f.color.value = p.color;
+      
+      // Обновление кастомных селектов при редактировании
+      f.storage.value = p.storage; 
+      f.color.value = p.color;
       f.condition.value = p.condition;
-      f.battery.value = p.battery || ''; f.kit.value = p.kit || '';
-      f.sim.value = p.sim || ''; f.imei.value = p.imei || '';
+      f.kit.value = p.kit || '';
+      f.sim.value = p.sim || ''; 
+      
+      // Синхронизация визуальной части селектов
+      addForm.querySelectorAll('.custom-select-wrapper').forEach(wrapper => {
+        const select = wrapper.previousElementSibling;
+        if (select && select.tagName === 'SELECT') {
+          const trigger = wrapper.querySelector('.custom-select-trigger');
+          const selectedOpt = select.options[select.selectedIndex];
+          if (selectedOpt) trigger.querySelector('span').textContent = selectedOpt.text;
+          
+          wrapper.querySelectorAll('.custom-select-option').forEach(opt => {
+            opt.classList.toggle('selected', opt.dataset.value === select.value);
+          });
+        }
+      });
+
+      f.battery.value = p.battery || ''; 
+      f.imei.value = p.imei || '';
       f.description.value = p.description;
       $('input-hit').checked = p.is_hit || false;
       $('input-draft').checked = p.status === 'draft';
@@ -2240,6 +2376,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     if (!sel) return;
     var id = Number(sel.dataset.statusId);
     var status = sel.value;
+    // Применяем цвет к нативному селекту (на случай если кастомный не сработал)
     sel.className = 'status-select ' + status;
     await api('/api/admin/phones/' + id, { method: 'PUT', body: JSON.stringify({ status: status }) });
     await loadPhones();
