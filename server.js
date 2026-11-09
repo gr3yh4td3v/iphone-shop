@@ -1494,25 +1494,42 @@ const adminHTML = String.raw`<!DOCTYPE html>
   body { font-family:'Inter', -apple-system, sans-serif; background:var(--bg); color:var(--text); }
   .container { max-width:1100px; margin:0 auto; padding:0 20px; }
   
-  .login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--bg); padding:20px; }
-  .login-box { background:#fff; border-radius:24px; padding:40px; width:100%; max-width:400px; box-shadow:0 10px 40px rgba(0,0,0,0.05); border:1px solid var(--border); }
+  /* Анимированный фон для страницы входа */
+  .login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding:20px; }
+  
+  /* Анимация появления карточки */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .login-box { background:#fff; border-radius:24px; padding:40px; width:100%; max-width:400px; box-shadow:0 20px 40px rgba(0,0,0,0.08); border:1px solid rgba(255,255,255,0.5); animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   .login-box h1 { font-size:24px; margin-bottom:8px; font-weight:700; letter-spacing:-0.02em; }
   .login-box p { color:var(--muted); font-size:14px; margin-bottom:24px; }
-  .login-box input { width:100%; padding:14px 16px; border:1px solid var(--border); background:#fafafa; border-radius:12px; font-size:15px; margin-bottom:16px; font-family:inherit; outline:none; transition:border-color .2s; }
-  .login-box input:focus { border-color:var(--text); background:#fff; }
+  
+  /* Стили поля ввода с красивым фокусом */
+  .login-box input { width:100%; padding:14px 16px; border:1px solid var(--border); background:#fafafa; border-radius:12px; font-size:15px; margin-bottom:16px; font-family:inherit; outline:none; transition:all .3s; }
+  .login-box input:focus { border-color:var(--accent); background:#fff; box-shadow: 0 0 0 4px rgba(0,113,227,0.1); }
+  
   .login-err { color:var(--red); font-size:13px; text-align:center; margin-top:12px; min-height:20px; }
   
-  /* Контейнер для кнопки Telegram */
+  /* Контейнер для кнопки Telegram с анимацией */
   .tg-widget-wrap { 
     display: flex; 
     justify-content: center; 
     margin-bottom: 20px; 
     border-radius: 12px; 
     overflow: hidden; 
-    background: #54a9eb; /* Синий цвет Telegram, чтобы скрыть черные углы */
+    background: #54a9eb; 
     width: fit-content;
     margin-left: auto;
     margin-right: auto;
+    box-shadow: 0 4px 12px rgba(84, 169, 235, 0.3);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tg-widget-wrap:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 10px 25px rgba(84, 169, 235, 0.5);
   }
   .tg-widget-wrap iframe {
     display: block;
@@ -1520,6 +1537,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
     border: none !important;
   }
   
+  /* Красивый разделитель */
+  .divider { display: flex; align-items: center; text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
+  .divider::before { margin-right: 10px; }
+  .divider::after { margin-left: 10px; }
+
   .app { display:none; }
   .app.visible { display:block; }
   header { background:rgba(251, 251, 253, 0.8); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:50; }
@@ -1531,7 +1554,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .header-actions { display:flex; gap:12px; }
   
   .btn { border:none; border-radius:12px; padding:12px 24px; font-size:14px; font-weight:600; cursor:pointer; background:var(--text); color:#fff; transition:all .2s; font-family:inherit; }
-  .btn:hover:not(:disabled) { background:#000; }
+  .btn:hover:not(:disabled) { background:#000; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
   .btn:disabled { opacity:0.5; cursor:not-allowed; }
   .btn-secondary { background:#f5f5f7; color:var(--text); border:none; }
   .btn-secondary:hover { background:#e5e5ea; }
@@ -1564,7 +1587,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .form-grid .full { grid-column:1 / -1; }
   .form-card label { display:block; font-size:13px; font-weight:600; margin-bottom:8px; color:var(--text); }
   
-  .form-card input, .form-card textarea { width:100%; padding:14px 16px; border:1px solid var(--border); background:#fafafa; border-radius:12px; font-size:15px; font-family:inherit; outline:none; transition:border-color .2s; }
+  .form-card input, .form-card textarea { width:100%; padding:14px 16px; border:1px solid var(--border); background:#fafafa; border-radius:12px; font-size:15px; font-family:inherit; outline:none; transition:all .2s; }
   .form-card textarea { min-height:100px; resize:vertical; }
   
   .form-card select {
@@ -1574,7 +1597,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     background-repeat: no-repeat; background-position: right 16px center; background-size: 16px;
   }
   
-  .form-card input:focus, .form-card select:focus, .form-card textarea:focus { border-color:var(--text); background-color:#fff; }
+  .form-card input:focus, .form-card select:focus, .form-card textarea:focus { border-color:var(--accent); background-color:#fff; box-shadow: 0 0 0 3px rgba(0,113,227,0.1); }
 
   .form-actions { display:flex; gap:12px; margin-top:32px; }
   .form-msg { margin-top:20px; padding:14px; border-radius:12px; font-size:15px; text-align:center; display:none; font-weight:500; }
@@ -1736,7 +1759,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     <h1>Админ-панель</h1>
     <p>Войдите с помощью Telegram или введите пароль</p>
 
-    <!-- Красивая кнопка входа через Telegram -->
+    <!-- Анимированная кнопка Telegram -->
     <div class="tg-widget-wrap">
       <script async src="https://telegram.org/js/telegram-widget.js?22" 
         data-telegram-login="ShopysiPhonesBot" 
@@ -1748,7 +1771,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
       </script>
     </div>
 
-    <div style="text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 20px;">— или —</div>
+    <div class="divider">или</div>
 
     <form id="login-form">
       <input type="password" id="password" placeholder="Пароль" required autocomplete="current-password">
