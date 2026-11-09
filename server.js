@@ -1625,12 +1625,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .admin-hit-badge { background: var(--text); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
 
   .status-select { display: none; } /* Скрываем нативный селект */
-  .custom-select-trigger.status-trigger { padding: 10px 14px; padding-right: 32px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; outline: none; transition: all .2s; background-image: none; justify-content: space-between; }
-  .custom-select-trigger.status-trigger svg { width: 12px; height: 12px; }
-  .custom-select-trigger.status-trigger.available { color:#1a7f37; border-color:#cce8d5; background-color:#f0fdf4; }
-  .custom-select-trigger.status-trigger.reserved  { color:#b05e00; border-color:#ffe8cc; background-color:#fff7ed; }
-  .custom-select-trigger.status-trigger.sold      { color:#b0251f; border-color:#fecdd3; background-color:#fef2f2; }
-  .custom-select-trigger.status-trigger.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
   
   .empty { text-align:center; padding:60px 20px; color:var(--muted); font-size:16px; }
 
@@ -1650,16 +1644,77 @@ const adminHTML = String.raw`<!DOCTYPE html>
 
   /* Стили для кастомного селекта */
   .custom-select-wrapper { position: relative; user-select: none; width: 100%; }
-  .custom-select-trigger { width: 100%; padding: 14px 16px; padding-right: 44px; border: 1px solid var(--border); background-color: #fafafa; border-radius: 12px; font-size: 15px; font-family: inherit; outline: none; transition: border-color .2s; cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; color: var(--text); }
+  
+  .custom-select-trigger { 
+    width: 100%; 
+    padding: 14px 16px; /* Убрали padding-right: 44px, теперь стрелка будет правее */
+    border: 1px solid var(--border); 
+    background-color: #fafafa; 
+    border-radius: 12px; 
+    font-size: 15px; 
+    font-family: inherit; 
+    outline: none; 
+    transition: border-color .2s; 
+    cursor: pointer; 
+    text-align: left; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    color: var(--text); 
+  }
   .custom-select-trigger:hover { background-color: #f5f5f7; }
   .custom-select-trigger.open { border-color: var(--text); background-color: #fff; }
-  .custom-select-trigger svg { width: 16px; height: 16px; color: var(--muted); transition: transform .3s; }
+  .custom-select-trigger svg { width: 16px; height: 16px; color: var(--muted); transition: transform .3s; flex-shrink: 0; }
   .custom-select-trigger.open svg { transform: rotate(180deg); }
-  .custom-select-options { position: absolute; top: calc(100% + 4px); left: 0; width: 100%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.1); opacity: 0; visibility: hidden; transform: translateY(-10px); transition: all .2s; z-index: 50; padding: 8px; max-height: 250px; overflow-y: auto; }
+  
+  .custom-select-options { 
+    position: absolute; 
+    top: calc(100% + 4px); 
+    left: 0; 
+    min-width: 100%; 
+    width: max-content; /* Автоматическая ширина под текст */
+    background: rgba(255, 255, 255, 0.95); 
+    backdrop-filter: blur(20px); 
+    border-radius: 12px; 
+    border: 1px solid var(--border); 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+    opacity: 0; 
+    visibility: hidden; 
+    transform: translateY(-10px); 
+    transition: all .2s; 
+    z-index: 50; 
+    padding: 8px; 
+    max-height: 250px; 
+    overflow-y: auto; 
+    overflow-x: hidden; /* Убираем горизонтальный скролл */
+  }
   .custom-select-options.open { opacity: 1; visibility: visible; transform: translateY(0); }
-  .custom-select-option { padding: 10px 14px; border-radius: 8px; font-size: 15px; cursor: pointer; transition: background .2s; color: var(--text); }
+  
+  .custom-select-option { 
+    padding: 10px 14px; 
+    border-radius: 8px; 
+    font-size: 15px; 
+    cursor: pointer; 
+    transition: background .2s; 
+    color: var(--text); 
+    white-space: nowrap; /* Текст не переносится */
+  }
   .custom-select-option:hover { background: #f5f5f7; }
   .custom-select-option.selected { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
+
+  /* Специфичные стили для статуса */
+  .custom-select-trigger.status-trigger { 
+    padding: 10px 14px; /* Убрали padding-right: 32px */
+    border-radius: 10px; 
+    font-size: 13px; 
+    font-weight: 600; 
+    background-image: none; 
+  }
+  .custom-select-trigger.status-trigger svg { width: 12px; height: 12px; }
+  .custom-select-trigger.status-trigger.available { color:#1a7f37; border-color:#cce8d5; background-color:#f0fdf4; }
+  .custom-select-trigger.status-trigger.reserved  { color:#b05e00; border-color:#ffe8cc; background-color:#fff7ed; }
+  .custom-select-trigger.status-trigger.sold      { color:#b0251f; border-color:#fecdd3; background-color:#fef2f2; }
+  .custom-select-trigger.status-trigger.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
 
   @media (max-width:720px) {
     .dashboard { flex-direction: column; }
