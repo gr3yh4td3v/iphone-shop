@@ -70,7 +70,6 @@ function dataURItoBlob(dataURI) {
   return new Blob([ab], { type: mimeString });
 }
 
-// Отправка красивого уведомления тебе в личку о новом товаре
 async function notifyProductAdded(phone) {
   if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) return;
   const apiBase = getTelegramApiBase();
@@ -176,6 +175,7 @@ function auth(req, res, next) {
 // ============================================================
 //                         PUBLIC API
 // ============================================================
+// Этот роут отдает товары на САЙТ (без черновиков)
 app.get('/api/phones', (req, res) => {
   const phones = readDB().phones.filter(p => p.status !== 'draft');
   res.json(phones);
@@ -288,6 +288,11 @@ app.post('/api/order', async (req, res) => {
 // ============================================================
 //                        ADMIN API
 // ============================================================
+// Этот роут отдает товары в АДМИНКУ (со всеми черновиками)
+app.get('/api/admin/phones', auth, (req, res) => {
+  res.json(readDB().phones);
+});
+
 app.post('/api/admin/login', (req, res) => {
   if (req.body.password === process.env.ADMIN_PASSWORD) return res.json({ ok: true });
   res.status(401).json({ ok: false, error: 'Неверный пароль' });
@@ -388,7 +393,7 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   writeDB(db);
 
   if (finalStatus !== 'draft') {
-    await notifyProductAdded(phone); // Новое подробное уведомление с фото
+    await notifyProductAdded(phone);
     await postToChannel(phone);
   }
 
@@ -2289,7 +2294,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     $('login-screen').style.display = 'none';
     $('app').classList.add('visible');
     loadPhones();
-    initCustomSelects(); // Инициализация селектов в форме
+    initCustomSelects();
   }
   window.logout = function() {
     localStorage.removeItem('admin_pw');
@@ -2303,7 +2308,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     window.history.replaceState({}, document.title, "/admin");
     showApp();
   } else if (localStorage.getItem('admin_pw')) {
-    api('/api/phones').then(function(r) {
+    api('/api/admin/phones').then(function(r) {
       if (r.ok) showApp();
       else localStorage.removeItem('admin_pw');
     });
@@ -2320,7 +2325,8 @@ const adminHTML = String.raw`<!DOCTYPE html>
   };
 
   async function loadPhones() {
-    var r = await api('/api/phones');
+    // ИСПОЛЬЗУЕМ НОВЫЙ РОУТ ДЛЯ АДМИНКИ
+    var r = await api('/api/admin/phones');
     phones = await r.json();
     renderList();
     updateStats();
@@ -2393,7 +2399,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
       '</div>';
     }
     list.innerHTML = html;
-    initCustomSelects(); // Инициализация селектов в списке товаров
+    initCustomSelects();
   }
 
   function renderReviews() {
@@ -2699,7 +2705,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   });
 
   if (localStorage.getItem('admin_pw')) {
-    api('/api/phones').then(function(r) {
+    api('/api/admin/phones').then(function(r) {
       if (r.ok) showApp();
       else localStorage.removeItem('admin_pw');
     });
