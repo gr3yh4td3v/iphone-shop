@@ -750,18 +750,20 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges { display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap; }
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
-  .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  
+  .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
+  @media(min-width: 768px) { .detail-bottom { flex-direction: row; align-items: center; justify-content: space-between; } }
+  
   .detail-price-wrap { display: flex; flex-direction: column; }
   .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; white-space: nowrap; }
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  /* Улучшенные кнопки */
-  .detail-actions { display: flex; align-items: center; gap: 10px; width: 100%; }
-  @media (min-width: 768px) { .detail-actions { width: auto; } }
-  .detail-actions .btn { flex: 1; justify-content: center; padding: 12px 20px; font-size: 15px; }
-  .detail-actions .btn:last-child { flex: 1.5; }
-
+  .detail-actions { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
+  @media(min-width: 768px) { .detail-actions { width: auto; flex-wrap: nowrap; } }
+  .detail-actions .btn { flex: 1 1 auto; justify-content: center; padding: 12px 20px; font-size: 15px; }
+  @media(min-width: 768px) { .detail-actions .btn { flex: 0 0 auto; } }
+  
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; }
   .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
   .btn-outline.active { color: var(--red); border-color: var(--red); background: rgba(255,59,48,0.05); }
@@ -839,9 +841,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
-    .detail-bottom { flex-direction: column; align-items: flex-start; }
-    .detail-actions { flex-direction: column; gap: 8px; }
-    .detail-actions .btn { width: 100%; flex: none; }
   }
 </style>
 </head>
@@ -952,7 +951,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
         <h4>Компания</h4>
         <ul>
           <li><a onclick="showInfo('about')">О нас</a></li>
-          <li><a onclick="showInfo('reviews')">Отзывы</a></li>
+          <li><a onclick="scrollToReviews()">Отзывы</a></li>
           <li><a onclick="showInfo('contacts')">Контакты</a></li>
         </ul>
       </div>
@@ -1634,16 +1633,26 @@ const indexHTML = String.raw`<!DOCTYPE html>
     currentDetailId = null; 
   };
 
+  // Обновленная функция "Поделиться"
   document.getElementById('detail-share-btn').addEventListener('click', async function() {
     if (!currentDetailId) return;
     const p = allPhones.find(x => x.id === currentDetailId);
     if (!p) return;
 
-    // Безопасное формирование строки без шаблонных литералов (обратных кавычек)
-    const shareText = 'Смотри какой аппарат: ' + p.brand + ' ' + p.model + ' за ' + Number(p.price).toLocaleString('ru-RU') + ' ₽\n' + window.location.origin + '/?id=' + p.id;
+    const shareUrl = window.location.origin + '/?id=' + p.id;
+    const priceFormatted = Number(p.price).toLocaleString('ru-RU') + ' ₽';
+    
+    // Красивый текст для шаринга
+    let shareText = '🔥 Смотри, какой аппарат нашел:\n';
+    shareText += '📱 ' + p.brand + ' ' + p.model + ' ' + (p.storage || '') + '\n';
+    if (p.color) shareText += '🎨 ' + p.color + '\n';
+    shareText += '💰 Всего ' + priceFormatted + '\n\n';
+    shareText += '👉 Подробнее: ' + shareUrl;
+
     const btnSpan = this.querySelector('span');
     const originalText = btnSpan.textContent;
 
+    // Функция для копирования (фоллбэк)
     const copyToClipboard = async () => {
       try {
         await navigator.clipboard.writeText(shareText);
@@ -1661,12 +1670,35 @@ const indexHTML = String.raw`<!DOCTYPE html>
       }
     };
 
+    // Пытаемся использовать Web Share API с файлом (фото)
+    if (navigator.share && p.images && p.images.length > 0) {
+      try {
+        // Конвертируем Base64 в File
+        const res = await fetch(p.images[0]);
+        const blob = await res.blob();
+        const file = new File([blob], 'photo.jpg', { type: blob.type });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            text: shareText,
+            files: [file]
+          });
+          return; // Успешно поделились с фото
+        }
+      } catch (err) {
+        console.log('Ошибка при попытке поделиться с фото:', err);
+        // Если ошибка, идем дальше (попробуем без фото или скопируем)
+      }
+    }
+
+    // Если не поддерживает файлы или фото нет, пробуем просто текст
     if (navigator.share) {
       try {
         await navigator.share({
           title: p.brand + ' ' + p.model,
           text: shareText
         });
+        return;
       } catch (err) {
         if (err.name !== 'AbortError') {
           await copyToClipboard();
@@ -1725,6 +1757,18 @@ const indexHTML = String.raw`<!DOCTYPE html>
     reviewModal.classList.remove('open');
   };
 
+  // Скролл к отзывам или показ модалки
+  window.scrollToReviews = function() {
+    const section = document.getElementById('reviews-section');
+    if (section && section.style.display !== 'none') {
+      section.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      document.getElementById('info-title').textContent = 'Отзывы';
+      document.getElementById('info-text').innerHTML = '<p class="info-text-block">У нас пока нет опубликованных отзывов.<br><br>Но если вы уже совершили у нас покупку, мы будем очень рады, если вы поделитесь своим впечатлением!</p><button class="btn" style="margin-top:20px;" onclick="closeInfo(); openReview();">Оставить отзыв</button>';
+      infoModal.classList.add('open');
+    }
+  };
+
   var infoData = {
     meeting: { title: 'Встреча и оплата', html: '<p class="info-text-block">Мы не отправляем товар почтой. Встречаемся лично в удобном для Вас общественном месте (торговый центр, кафе) для осмотра и передачи устройства. Оплата наличными или переводом на карту при получении.</p>' },
     check: { title: 'Проверка при встрече', html: '<p class="info-text-block">Вы можете проверять устройство столько, сколько потребуется: проверка IMEI, экрана, динамиков, аккумулятора и всех функций. Возврата после сделки нет, так как Вы проверяете все на месте.</p>' },
@@ -1735,7 +1779,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
             '<div class="faq-item"><div class="faq-q">Есть ли торг?</div><div class="faq-a">Небольшая скидка возможна, если Вы готовы совершить сделку сегодня или завтра. Мы ценим быстроту, поэтому готовы поощрить Вас за оперативность.</div></div>'
     },
     about: { title: 'О нас', html: '<p class="info-text-block">Мы верим, что хорошая техника не должна стоить безумных денег. Наш магазин — это тщательно отобранные устройства. Мы гарантируем безупречное техническое состояние: лично проверяем историю каждого аппарата, аккумулятор и подлинность деталей. Все внешние нюансы (если они есть) мы всегда честно описываем. Вы получаете статусный гаджет по честной цене и без рисков покупки с рук.</p>' },
-    reviews: { title: 'Отзывы', html: '<p class="info-text-block">Мы очень дорожим своей репутацией. Вы можете посмотреть реальные отзывы наших клиентов в разделе «Отзывы наших клиентов» на этой странице. Если Вы уже совершили у нас покупку, будем рады Вашему отзыву!</p>' },
     contacts: { title: 'Контакты', html: '<p class="info-text-block">Связаться с нами напрямую можно в Telegram: <b>@ShopysiPhones</b>.<br>Наши новости и отзывы в канале: <b>@ShopysiPhonesStore</b>.<br>Мы онлайн ежедневно с 10:00 до 22:00.</p>' },
     privacy: { title: 'Политика конфиденциальности', html: '<p class="info-text-block">Ваша конфиденциальность очень важна для нас. <br><br>Мы собираем только те данные (имя и контакт), которые вы добровольно оставляете в формах заявок на нашем сайте. Эти данные используются исключительно для связи с вами по поводу покупки интересующего вас устройства.<br><br>Мы никогда не передаем ваши персональные данные третьим лицам и не используем их для спам-рассылок. Нажимая кнопку «Отправить» в форме заявки, вы даете согласие на обработку ваших персональных данных в указанных целях.</p>' },
   };
