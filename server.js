@@ -25,7 +25,7 @@ function readDB() {
       if (p.orders === undefined) p.orders = 0;
       if (p.is_hit === undefined) p.is_hit = false;
       if (p.status === undefined) p.status = 'available';
-      if (p.favorites === undefined) p.favorites = 0; // Новое поле для избранного
+      if (p.favorites === undefined) p.favorites = 0;
     });
 
     return data;
@@ -134,10 +134,9 @@ app.get('/api/phones', (req, res) => {
   res.json(phones);
 });
 
-// Новый API для отслеживания избранного
 app.post('/api/phone/:id/favorite', (req, res) => {
   const id = Number(req.params.id);
-  const { action } = req.body; // 'add' или 'remove'
+  const { action } = req.body;
   const db = readDB();
   const phone = db.phones.find(p => p.id === id);
   if (phone) {
@@ -247,10 +246,9 @@ app.post('/api/admin/login', (req, res) => {
   res.status(401).json({ ok: false, error: 'Неверный пароль' });
 });
 
-// Роут для проверки подписи Telegram
 app.get('/api/admin/auth/telegram', (req, res) => {
   const { hash, ...data } = req.query;
-  
+
   if (!hash) return res.status(400).send('Отсутствует подпись Telegram');
 
   const checkString = Object.keys(data).sort().map(key => `${key}=${data[key]}`).join('\n');
@@ -271,7 +269,7 @@ app.get('/api/admin/export', auth, (req, res) => {
     const clean = (s) => '"' + String(s || '').replace(/"/g, '""') + '"';
     csv += `${p.id};${clean(p.brand)};${clean(p.model)};${p.price};${p.views||0};${p.orders||0};${p.favorites||0};${p.status};${clean(new Date(p.created_at).toLocaleString('ru-RU'))}\n`;
   });
-  
+
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="iphone-shop-db.csv"');
   res.send('\uFEFF' + csv);
@@ -336,7 +334,7 @@ app.post('/api/admin/phones', auth, async (req, res) => {
     status: finalStatus,
     views: 0,
     orders: 0,
-    favorites: 0, // Инициализируем счетчик избранного
+    favorites: 0,
     created_at: new Date().toISOString()
   };
   db.phones.unshift(phone);
@@ -499,9 +497,18 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-card .card-title, .favorite-card .card-title { font-size: 16px; }
   .recent-card .price, .favorite-card .price { font-size: 20px; }
   
-  /* Убираем кнопки в маленьких карточках, чтобы не ломать верстку */
-  .recent-card .btn, .favorite-card .btn { display: none !important; }
-  .recent-card .card-footer, .favorite-card .card-footer { justify-content: flex-start; }
+  /* Исправленная верстка для маленьких карточек (кнопка под ценой) */
+  .recent-card .card-footer, .favorite-card .card-footer { 
+    flex-direction: column; 
+    align-items: stretch; 
+    gap: 8px; 
+  }
+  .recent-card .btn, .favorite-card .btn { 
+    padding: 8px 12px; 
+    font-size: 13px; 
+    width: 100%;
+    text-align: center;
+  }
   .recent-card .status, .favorite-card .status { top: 10px; right: 10px; font-size: 11px; padding: 6px 10px; }
   .recent-card .hit-badge, .favorite-card .hit-badge { top: 10px; left: 10px; font-size: 11px; padding: 4px 8px; }
   .recent-card .trust-badges, .favorite-card .trust-badges { display: none; }
@@ -1124,12 +1131,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
     var btn = '';
     
-    if (cardType !== 'mini') {
-      if (p.status === 'sold') {
-        btn = '<button class="btn" data-notify-btn="' + p.id + '">Уведомить</button>';
-      } else {
-        btn = '<button class="btn" data-order-btn="' + p.id + '">' + STATUS_BTN[p.status] + '</button>';
-      }
+    if (p.status === 'sold') {
+      btn = '<button class="btn" data-notify-btn="' + p.id + '">Уведомить</button>';
+    } else {
+      btn = '<button class="btn" data-order-btn="' + p.id + '">' + STATUS_BTN[p.status] + '</button>';
     }
 
     var now = new Date().getTime();
@@ -1755,8 +1760,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .phone-info { min-width:0; }
   .phone-name { font-weight:700; font-size:17px; margin-bottom:6px; letter-spacing:-0.01em; display: flex; align-items: center; gap: 8px; }
   .phone-meta { color:var(--muted); font-size:14px; margin-bottom: 4px; }
-  .phone-stats { font-size: 12px; color: #0071e3; font-weight: 600; display: flex; gap: 12px; }
-  .phone-stats .fav-stat { color: var(--red); } /* Красный цвет для избранного */
+  .phone-stats { font-size: 12px; color: #0071e3; font-weight: 600; display: flex; gap: 12px; align-items: center; }
+  
+  /* Стили для иконки избранного в админке */
+  .fav-stat { color: var(--red); display: flex; align-items: center; gap: 4px; }
+  .fav-icon { width: 14px; height: 14px; fill: currentColor; }
+
   .phone-price { font-weight:700; font-size:18px; white-space:nowrap; letter-spacing:-0.02em; display: flex; flex-direction: column; }
   .old-price-strike { text-decoration: line-through; color: var(--muted); font-size: 13px; font-weight: 500; }
   .phone-actions { display:flex; gap:10px; align-items:center; }
@@ -1778,7 +1787,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
 
   .admin-hit-badge { background: var(--text); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
 
-  .status-select { display: none; } /* Скрываем нативный селект */
+  .status-select { display: none; }
   
   .empty { text-align:center; padding:60px 20px; color:var(--muted); font-size:16px; }
 
@@ -1801,7 +1810,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   
   .custom-select-trigger { 
     width: 100%; 
-    padding: 14px 16px; /* Убрали padding-right: 44px, теперь стрелка будет правее */
+    padding: 14px 16px; 
     border: 1px solid var(--border); 
     background-color: #fafafa; 
     border-radius: 12px; 
@@ -1826,7 +1835,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     top: calc(100% + 4px); 
     left: 0; 
     min-width: 100%; 
-    width: max-content; /* Автоматическая ширина под текст */
+    width: max-content; 
     background: rgba(255, 255, 255, 0.95); 
     backdrop-filter: blur(20px); 
     border-radius: 12px; 
@@ -1840,7 +1849,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     padding: 8px; 
     max-height: 250px; 
     overflow-y: auto; 
-    overflow-x: hidden; /* Убираем горизонтальный скролл */
+    overflow-x: hidden; 
   }
   .custom-select-options.open { opacity: 1; visibility: visible; transform: translateY(0); }
   
@@ -1851,14 +1860,14 @@ const adminHTML = String.raw`<!DOCTYPE html>
     cursor: pointer; 
     transition: background .2s; 
     color: var(--text); 
-    white-space: nowrap; /* Текст не переносится */
+    white-space: nowrap; 
   }
   .custom-select-option:hover { background: #f5f5f7; }
   .custom-select-option.selected { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
 
   /* Специфичные стили для статуса */
   .custom-select-trigger.status-trigger { 
-    padding: 10px 14px; /* Убрали padding-right: 32px */
+    padding: 10px 14px; 
     border-radius: 10px; 
     font-size: 13px; 
     font-weight: 600; 
@@ -2315,7 +2324,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
       var statsHtml = '<div class="phone-stats">' +
         '<span>Просмотры: ' + (p.views || 0) + '</span>' +
         '<span>Заявки: ' + (p.orders || 0) + '</span>' +
-        '<span class="fav-stat">❤️ В избранном: ' + (p.favorites || 0) + '</span>' +
+        '<span class="fav-stat"><svg viewBox="0 0 24 24" class="fav-icon"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> В избранном: ' + (p.favorites || 0) + '</span>' +
       '</div>';
 
       var hitHtml = p.is_hit ? '<span class="admin-hit-badge">ХИТ</span>' : '';
