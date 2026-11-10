@@ -1132,6 +1132,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   var STATUS_LABEL = { available:'В наличии', reserved:'Забронировано', sold:'Продано' };
   var STATUS_BTN   = { available:'Забронировать', reserved:'Узнать', sold:'Уведомить' };
   var allPhones = [];
+  var allReviews = [];
   var currentFilter = 'all';
   var currentSearch = '';
   var currentSort = 'default';
@@ -1307,6 +1308,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     });
 
     fetch('/api/reviews').then(function(r) { return r.json(); }).then(function(data) {
+      allReviews = data;
       renderReviews(data);
     });
   }
@@ -1651,21 +1653,39 @@ const indexHTML = String.raw`<!DOCTYPE html>
     const btnSpan = this.querySelector('span');
     const originalText = btnSpan.textContent;
 
-    const forceCopy = () => {
-      const textarea = document.createElement('textarea');
-      textarea.value = shareText;
-      textarea.style.position = 'fixed';
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      try {
-        document.execCommand('copy');
-        btnSpan.textContent = 'Скопировано!';
-      } catch (err) {
-        btnSpan.textContent = 'Ошибка';
-      }
-      document.body.removeChild(textarea);
+    const successCopy = () => {
+      btnSpan.textContent = 'Скопировано!';
       setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
+    };
+
+    const forceCopy = () => {
+      // Сначала пробуем современный API
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(shareText).then(successCopy).catch(() => {
+          // Фоллбэк для старых браузеров или если API заблокирован
+          fallbackCopy();
+        });
+      } else {
+        fallbackCopy();
+      }
+
+      function fallbackCopy() {
+        const textarea = document.createElement('textarea');
+        textarea.value = shareText;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          successCopy();
+        } catch (err) {
+          btnSpan.textContent = 'Ошибка копирования';
+          setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
+        }
+        document.body.removeChild(textarea);
+      }
     };
 
     if (navigator.share && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
@@ -1731,9 +1751,12 @@ const indexHTML = String.raw`<!DOCTYPE html>
   };
 
   window.scrollToReviews = function() {
-    const section = document.getElementById('reviews-section');
-    if (section && section.style.display !== 'none') {
-      section.scrollIntoView({ behavior: 'smooth' });
+    // Проверяем реальное наличие отзывов в массиве
+    if (allReviews.length > 0) {
+      const section = document.getElementById('reviews-section');
+      const yOffset = -80; // Отступ для шапки
+      const y = section.getBoundingClientRect().top + window.pageYOffset + yOffset;
+      window.scrollTo({ top: y, behavior: 'smooth' });
     } else {
       document.getElementById('info-title').textContent = 'Отзывы';
       document.getElementById('info-text').innerHTML = '<p class="info-text-block">У нас пока нет опубликованных отзывов.<br><br>Но если вы уже совершили у нас покупку, мы будем очень рады, если вы поделитесь своим впечатлением!</p><button class="btn" style="margin-top:20px;" onclick="closeInfo(); openReview();">Оставить отзыв</button>';
