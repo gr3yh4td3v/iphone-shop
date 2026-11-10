@@ -743,14 +743,17 @@ const indexHTML = String.raw`<!DOCTYPE html>
   
   .detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }
   .detail-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; margin-bottom: 0; }
-  .detail-icon-actions { display: flex; gap: 8px; flex-shrink: 0; margin-top: 4px; }
+  
+  .detail-meta-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; gap: 16px; flex-wrap: wrap; }
+  .detail-meta { color: var(--muted); font-size: 16px; margin-bottom: 0; }
+  
+  .detail-icon-actions { display: flex; gap: 8px; flex-shrink: 0; }
   .btn-icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; padding: 0; }
   .btn-icon:hover { background: #f5f5f7; border-color: #a1a1a6; }
   .btn-icon svg { width: 20px; height: 20px; }
   .btn-icon.active { color: var(--red); border-color: var(--red); background: rgba(255,59,48,0.05); }
   .btn-icon.active svg { fill: var(--red); }
 
-  .detail-meta { color: var(--muted); font-size: 16px; margin-bottom: 32px; }
   .specs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; background: #fbfbfd; padding: 24px; border-radius: 20px; border: 1px solid var(--border); }
   .spec-item { display: flex; flex-direction: column; gap: 4px; }
   .spec-label { font-size: 13px; color: var(--muted); font-weight: 500; }
@@ -761,17 +764,20 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
-  @media(min-width: 768px) { .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; } }
+  @media(min-width: 768px) { 
+    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: flex-start; gap: 24px; } 
+  }
   
   .detail-price-wrap { display: flex; flex-direction: column; }
   .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; white-space: nowrap; }
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  /* ШИРОКАЯ КНОПКА ЗАБРОНИРОВАТЬ */
   .detail-actions { display: flex; width: 100%; }
-  @media(min-width: 768px) { .detail-actions { width: auto; min-width: 300px; } }
-  .detail-actions .btn { width: 100%; justify-content: center; padding: 16px 32px; font-size: 16px; }
+  @media(min-width: 768px) { 
+    .detail-actions { width: auto; min-width: 0; } 
+    .detail-actions .btn { padding: 16px 32px; font-size: 16px; }
+  }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
   .order-modal h2, .review-modal h2 { font-size: 28px; margin-bottom: 8px; font-weight: 800; letter-spacing: -0.02em; }
@@ -845,7 +851,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
     .detail-header { flex-direction: column; gap: 12px; }
-    .detail-icon-actions { margin-top: 0; }
+    .detail-meta-row { flex-direction: column; align-items: flex-start; gap: 12px; }
     .detail-bottom { flex-direction: column; align-items: flex-start; }
     .detail-actions { max-width: 100%; }
   }
@@ -990,6 +996,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
       
       <div class="detail-header">
         <div class="detail-title" id="detail-title"></div>
+      </div>
+      
+      <div class="detail-meta-row">
+        <div class="detail-meta" id="detail-meta"></div>
         <div class="detail-icon-actions">
           <button class="btn-icon" id="detail-share-btn" title="Поделиться">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1004,8 +1014,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
         </div>
       </div>
 
-      <div class="detail-meta" id="detail-meta"></div>
-      
       <div class="specs-grid" id="detail-specs"></div>
       
       <div class="detail-desc" id="detail-desc"></div>
