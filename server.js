@@ -1564,7 +1564,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
       if (p.images.length > 1) {
         var thumbsHtml = '';
         for (var i = 0; i < p.images.length; i++) {
-          thumbsHtml += '<img src="' + p.images[i] + '" class="detail-thumb ' + (i===0?'active':'') + '" onclick="changeMainImg(this, '' + p.images[i] + '')">';
+                        thumbsHtml += '<img src="' + p.images[i] + '" class="detail-thumb ' + (i===0?'active':'') + '" onclick="changeMainImg(this, ' + i + ')">';
         }
         thumbsBox.innerHTML = thumbsHtml;
         thumbsBox.style.display = 'flex';
@@ -1631,8 +1631,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
     detailModal.classList.add('open');
   }
 
-  window.changeMainImg = function(el, src) {
-    document.getElementById('main-gallery-img').src = src;
+  window.changeMainImg = function(el, index) {
+    var p = allPhones.find(function(x) { return x.id === currentDetailId; });
+    if (!p || !p.images) return;
+    document.getElementById('main-gallery-img').src = p.images[index];
     document.querySelectorAll('.detail-thumb').forEach(function(t) { t.classList.remove('active'); });
     el.classList.add('active');
   };
