@@ -771,7 +771,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price.discounted { color: var(--red); }
   
   /* Кнопки в детальном окне */
-  .detail-actions { display: flex; align-items: center; gap: 12px; }
+  .detail-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; }
   .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
   .btn-outline.active { color: var(--red); border-color: var(--red); background: rgba(255,59,48,0.05); }
@@ -1029,6 +1029,14 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <div class="detail-price" id="detail-price"></div>
         </div>
         <div class="detail-actions">
+          <button class="btn btn-outline" id="detail-share-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+              <polyline points="16 6 12 2 8 6"></polyline>
+              <line x1="12" y1="2" x2="12" y2="15"></line>
+            </svg>
+            <span>Поделиться</span>
+          </button>
           <button class="btn btn-outline" id="detail-fav-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
             <span>В избранное</span>
@@ -1644,6 +1652,46 @@ const indexHTML = String.raw`<!DOCTYPE html>
     detailModal.classList.remove('open'); 
     currentDetailId = null; 
   };
+
+  // SHARE BUTTON LOGIC
+  document.getElementById('detail-share-btn').addEventListener('click', async function() {
+    if (!currentDetailId) return;
+    const p = allPhones.find(x => x.id === currentDetailId);
+    if (!p) return;
+
+    const shareText = `Смотри какой аппарат: ${p.brand} ${p.model} за ${Number(p.price).toLocaleString('ru-RU')} ₽`;
+    const shareUrl = `${window.location.origin}/?id=${p.id}`;
+    const btnSpan = this.querySelector('span');
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${p.brand} ${p.model}`,
+          text: shareText,
+          url: shareUrl
+        });
+      } catch (err) {
+        // Игнорируем ошибку, если пользователь передумал делиться
+      }
+    } else {
+      // Фоллбэк для ПК
+      try {
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        btnSpan.textContent = 'Скопировано!';
+        setTimeout(() => { btnSpan.textContent = 'Поделиться'; }, 2000);
+      } catch (err) {
+        // Старый фоллбэк для http
+        const tempInput = document.createElement('input');
+        tempInput.value = `${shareText}\n${shareUrl}`;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+        btnSpan.textContent = 'Скопировано!';
+        setTimeout(() => { btnSpan.textContent = 'Поделиться'; }, 2000);
+      }
+    }
+  });
 
   document.getElementById('detail-fav-btn').addEventListener('click', function() {
     if (currentDetailId) {
