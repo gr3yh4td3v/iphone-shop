@@ -756,7 +756,12 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  .detail-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  /* Улучшенные кнопки */
+  .detail-actions { display: flex; align-items: center; gap: 10px; width: 100%; }
+  @media (min-width: 768px) { .detail-actions { width: auto; } }
+  .detail-actions .btn { flex: 1; justify-content: center; padding: 12px 20px; font-size: 15px; }
+  .detail-actions .btn:last-child { flex: 1.5; }
+
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; }
   .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
   .btn-outline.active { color: var(--red); border-color: var(--red); background: rgba(255,59,48,0.05); }
@@ -835,8 +840,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
     .detail-bottom { flex-direction: column; align-items: flex-start; }
-    .detail-actions { width: 100%; flex-direction: column; }
-    .detail-actions .btn { width: 100%; }
+    .detail-actions { flex-direction: column; gap: 8px; }
+    .detail-actions .btn { width: 100%; flex: none; }
   }
 </style>
 </head>
@@ -1634,33 +1639,41 @@ const indexHTML = String.raw`<!DOCTYPE html>
     const p = allPhones.find(x => x.id === currentDetailId);
     if (!p) return;
 
-    const shareText = 'Смотри какой аппарат: ' + p.brand + ' ' + p.model + ' за ' + Number(p.price).toLocaleString('ru-RU') + ' ₽';
-    const shareUrl = window.location.origin + '/?id=' + p.id;
+    // Безопасное формирование строки без шаблонных литералов (обратных кавычек)
+    const shareText = 'Смотри какой аппарат: ' + p.brand + ' ' + p.model + ' за ' + Number(p.price).toLocaleString('ru-RU') + ' ₽\n' + window.location.origin + '/?id=' + p.id;
     const btnSpan = this.querySelector('span');
+    const originalText = btnSpan.textContent;
+
+    const copyToClipboard = async () => {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        btnSpan.textContent = 'Скопировано!';
+        setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
+      } catch (err) {
+        const textarea = document.createElement('textarea');
+        textarea.value = shareText;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        btnSpan.textContent = 'Скопировано!';
+        setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
+      }
+    };
 
     if (navigator.share) {
       try {
         await navigator.share({
           title: p.brand + ' ' + p.model,
-          text: shareText,
-          url: shareUrl
+          text: shareText
         });
-      } catch (err) {}
-    } else {
-      try {
-        await navigator.clipboard.writeText(shareText + '\n' + shareUrl);
-        btnSpan.textContent = 'Скопировано!';
-        setTimeout(() => { btnSpan.textContent = 'Поделиться'; }, 2000);
       } catch (err) {
-        const tempInput = document.createElement('input');
-        tempInput.value = shareText + '\n' + shareUrl;
-        document.body.appendChild(tempInput);
-        tempInput.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempInput);
-        btnSpan.textContent = 'Скопировано!';
-        setTimeout(() => { btnSpan.textContent = 'Поделиться'; }, 2000);
+        if (err.name !== 'AbortError') {
+          await copyToClipboard();
+        }
       }
+    } else {
+      await copyToClipboard();
     }
   });
 
