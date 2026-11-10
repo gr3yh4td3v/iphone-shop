@@ -2119,8 +2119,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .flatpickr-current-month .flatpickr-monthDropdown-months { font-weight: 600; }
   .flatpickr-weekdays { background: transparent; }
   span.flatpickr-weekday { color: var(--muted); font-weight: 500; }
-  .flatpickr-monthDropdown-months { background: transparent; }
-  .flatpickr-monthDropdown-months option { background: #fff; color: var(--text); }
+  
+  /* Убираем стрелочки у часов и минут */
+  .flatpickr-time input { -moz-appearance: textfield; font-size: 16px; font-weight: 600; height: 40px; text-align: center; }
+  .flatpickr-time input::-webkit-outer-spin-button,
+  .flatpickr-time input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .flatpickr-time .flatpickr-time-separator { font-size: 18px; font-weight: 600; color: var(--text); }
 
   @media (max-width:720px) {
     .dashboard { flex-direction: column; }
@@ -2725,8 +2729,8 @@ const adminHTML = String.raw`<!DOCTYPE html>
       altInput: true,
       altFormat: "d.m.Y H:i",
       locale: "ru",
-      disableMobile: "true",
-      monthSelectorType: "dropdown"
+      disableMobile: "true"
+      // Убрали monthSelectorType: "dropdown", чтобы вернуть стандартные красивые стрелочки переключения месяцев
     });
   }
 
