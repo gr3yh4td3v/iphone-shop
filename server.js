@@ -752,22 +752,21 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
-  @media(min-width: 768px) { .detail-bottom { flex-direction: row; align-items: center; justify-content: space-between; } }
+  @media(min-width: 768px) { .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; } }
   
   .detail-price-wrap { display: flex; flex-direction: column; }
   .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; white-space: nowrap; }
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  .detail-actions { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
-  @media(min-width: 768px) { .detail-actions { width: auto; flex-wrap: nowrap; } }
-  .detail-actions .btn { flex: 1 1 auto; justify-content: center; padding: 12px 20px; font-size: 15px; }
-  @media(min-width: 768px) { .detail-actions .btn { flex: 0 0 auto; } }
+  .detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; }
+  .detail-actions .btn { width: 100%; justify-content: center; padding: 12px 10px; font-size: 14px; }
+  .detail-actions .btn:last-child { grid-column: 1 / -1; }
   
-  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 6px; }
   .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
   .btn-outline.active { color: var(--red); border-color: var(--red); background: rgba(255,59,48,0.05); }
-  .btn-outline svg { width: 20px; height: 20px; transition: all 0.2s; }
+  .btn-outline svg { width: 18px; height: 18px; transition: all 0.2s; }
   .btn-outline.active svg { fill: var(--red); }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
@@ -841,6 +840,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
+    .detail-bottom { flex-direction: column; align-items: flex-start; }
+    .detail-actions { max-width: 100%; }
   }
 </style>
 </head>
@@ -1633,7 +1634,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     currentDetailId = null; 
   };
 
-  // Обновленная функция "Поделиться"
   document.getElementById('detail-share-btn').addEventListener('click', async function() {
     if (!currentDetailId) return;
     const p = allPhones.find(x => x.id === currentDetailId);
@@ -1642,7 +1642,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     const shareUrl = window.location.origin + '/?id=' + p.id;
     const priceFormatted = Number(p.price).toLocaleString('ru-RU') + ' ₽';
     
-    // Красивый текст для шаринга
     let shareText = '🔥 Смотри, какой аппарат нашел:\n';
     shareText += '📱 ' + p.brand + ' ' + p.model + ' ' + (p.storage || '') + '\n';
     if (p.color) shareText += '🎨 ' + p.color + '\n';
@@ -1652,60 +1651,34 @@ const indexHTML = String.raw`<!DOCTYPE html>
     const btnSpan = this.querySelector('span');
     const originalText = btnSpan.textContent;
 
-    // Функция для копирования (фоллбэк)
-    const copyToClipboard = async () => {
+    const forceCopy = () => {
+      const textarea = document.createElement('textarea');
+      textarea.value = shareText;
+      textarea.style.position = 'fixed';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
       try {
-        await navigator.clipboard.writeText(shareText);
-        btnSpan.textContent = 'Скопировано!';
-        setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
-      } catch (err) {
-        const textarea = document.createElement('textarea');
-        textarea.value = shareText;
-        document.body.appendChild(textarea);
-        textarea.select();
         document.execCommand('copy');
-        document.body.removeChild(textarea);
         btnSpan.textContent = 'Скопировано!';
-        setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
+      } catch (err) {
+        btnSpan.textContent = 'Ошибка';
       }
+      document.body.removeChild(textarea);
+      setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
     };
 
-    // Пытаемся использовать Web Share API с файлом (фото)
-    if (navigator.share && p.images && p.images.length > 0) {
-      try {
-        // Конвертируем Base64 в File
-        const res = await fetch(p.images[0]);
-        const blob = await res.blob();
-        const file = new File([blob], 'photo.jpg', { type: blob.type });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            text: shareText,
-            files: [file]
-          });
-          return; // Успешно поделились с фото
-        }
-      } catch (err) {
-        console.log('Ошибка при попытке поделиться с фото:', err);
-        // Если ошибка, идем дальше (попробуем без фото или скопируем)
-      }
-    }
-
-    // Если не поддерживает файлы или фото нет, пробуем просто текст
-    if (navigator.share) {
+    if (navigator.share && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
       try {
         await navigator.share({
           title: p.brand + ' ' + p.model,
           text: shareText
         });
-        return;
       } catch (err) {
-        if (err.name !== 'AbortError') {
-          await copyToClipboard();
-        }
+        if (err.name !== 'AbortError') forceCopy();
       }
     } else {
-      await copyToClipboard();
+      forceCopy();
     }
   });
 
@@ -1757,7 +1730,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     reviewModal.classList.remove('open');
   };
 
-  // Скролл к отзывам или показ модалки
   window.scrollToReviews = function() {
     const section = document.getElementById('reviews-section');
     if (section && section.style.display !== 'none') {
