@@ -25,7 +25,7 @@ function readDB() {
     const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     if (!Array.isArray(data.phones)) data.phones = [];
     if (!Array.isArray(data.reviews)) data.reviews = [];
-    if (!Array.isArray(data.tokens)) data.tokens = []; // Для токенов отзывов
+    if (!Array.isArray(data.tokens)) data.tokens = [];
     if (!data.nextId) data.nextId = data.phones.reduce((m, p) => Math.max(m, p.id || 0), 0) + 1;
     if (!data.nextReviewId) data.nextReviewId = data.reviews.reduce((m, r) => Math.max(m, r.id || 0), 0) + 1;
 
@@ -369,7 +369,7 @@ app.get('/api/reviews', (req, res) => {
   res.json(approved);
 });
 
-// ОТЗЫВЫ С ТОКЕНАМИ (Только для реальных покупателей)
+// ОТЗЫВЫ С ТОКЕНАМИ
 app.post('/api/review', async (req, res) => {
   const { name, text, rating, phone_model, token } = req.body || {};
   
@@ -378,13 +378,11 @@ app.post('/api/review', async (req, res) => {
 
   const db = readDB();
   
-  // Ищем токен и проверяем, не использован ли он
   const tokenIndex = db.tokens.findIndex(t => t.token === token && t.used === false);
   if (tokenIndex === -1) {
     return res.status(403).json({ ok: false, error: 'Недействительная или уже использованная ссылка на отзыв.' });
   }
 
-  // Помечаем токен использованным
   db.tokens[tokenIndex].used = true;
 
   const review = {
@@ -439,10 +437,9 @@ app.post('/api/order', async (req, res) => {
     phone.orders = (phone.orders || 0) + 1;
   }
 
-  // Генерируем секретный токен для отзыва
   const reviewToken = crypto.randomBytes(16).toString('hex');
   db.tokens.push({ token: reviewToken, used: false, created_at: Date.now() });
-  writeDB(db); // Сохраняем токен в базу
+  writeDB(db);
 
   const phoneLine = phone
     ? `<b>${esc(phone.brand)} ${esc(phone.model)}</b>\n💰 Цена: ${Number(phone.price).toLocaleString('ru-RU')} ₽`
@@ -799,10 +796,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
-  /* ИЗМЕНЕННЫЙ CSS ДЛЯ НИЖНЕГО БЛОКА В МОДАЛКЕ */
+  /* ИСПРАВЛЕНО ТУТ: Уменьшен gap до 16px, кнопка прижата влево */
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
   @media(min-width: 768px) { 
-    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: flex-start; gap: 24px; } 
+    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: flex-start; gap: 16px; } 
   }
   
   .detail-price-wrap { display: flex; flex-direction: column; }
@@ -810,9 +807,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  .detail-actions { display: flex; width: 100%; }
+  /* ИСПРАВЛЕНО ТУТ: Убран margin-left: auto, чтобы кнопка не улетала вправо */
+  .detail-actions { display: flex; width: 100%; margin-left: 0; }
   @media(min-width: 768px) { 
-    .detail-actions { width: auto; min-width: 0; } 
+    .detail-actions { width: auto; min-width: 0; margin-left: 0; } 
     .detail-actions .btn { padding: 16px 32px; font-size: 16px; }
   }
 
