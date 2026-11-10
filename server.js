@@ -26,6 +26,8 @@ function readDB() {
       if (p.is_hit === undefined) p.is_hit = false;
       if (p.status === undefined) p.status = 'available';
       if (p.favorites === undefined) p.favorites = 0;
+      if (p.channel_message_id === undefined) p.channel_message_id = null;
+      if (p.channel_kind === undefined) p.channel_kind = null;
     });
 
     return data;
@@ -93,8 +95,13 @@ function formatPrice(phone) {
 }
 
 function buildProductCaption(phone, siteUrl) {
+  let header;
+  if (phone.status === 'sold')          header = `🔥 <b>Продано</b>`;
+  else if (phone.status === 'reserved') header = `🔥 <b>Забронировано</b>`;
+  else                                  header = `🔥 <b>Новое поступление!</b>`;
+
   const lines = [
-    `🔥 <b>Новое поступление!</b>`,
+    header,
     ``,
     `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>`,
   ];
@@ -167,28 +174,34 @@ async function notifyProductAdded(phone) {
   }
 }
 
-async function postToChannel(phone) {
-  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
+async function postToChannel(phone, opts = {}) {
+  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return null;
   const apiBase = getTelegramApiBase();
   const siteUrl = `https://iphone-shop.up.railway.app/?id=${phone.id}`;
   const caption = buildProductCaption(phone, siteUrl);
+  const silent = opts.silent === true;
 
   try {
     const formData = new FormData();
     formData.append('chat_id', process.env.CHANNEL_ID);
+    if (silent) formData.append('disable_notification', 'true');
+
     const images = phone.images || [];
     let endpoint = 'sendMessage';
+    let kind = 'text';
 
     if (images.length === 0) {
       formData.append('text', caption);
       formData.append('parse_mode', 'HTML');
     } else if (images.length === 1) {
       endpoint = 'sendPhoto';
+      kind = 'photo';
       formData.append('photo', dataURItoBlob(images[0]), 'photo.jpg');
       formData.append('caption', caption);
       formData.append('parse_mode', 'HTML');
     } else {
       endpoint = 'sendMediaGroup';
+      kind = 'media_group';
       const mediaArray = [];
       for (let i = 0; i < images.length; i++) {
         formData.append(`file${i}`, dataURItoBlob(images[i]), `photo${i}.jpg`);
@@ -199,10 +212,108 @@ async function postToChannel(phone) {
 
     const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/${endpoint}`, { method: 'POST', body: formData });
     const data = await res.json();
-    if (!data.ok) console.error('❌ Ошибка Telegram (канал):', data.description);
-    else console.log('✅ Пост в канал успешно отправлен!');
+
+    if (!data.ok) {
+      console.error('❌ Ошибка Telegram (канал):', data.description);
+      return null;
+    }
+
+    let messageId = null;
+    if (Array.isArray(data.result)) {
+      messageId = data.result[0] && data.result[0].message_id;
+    } else if (data.result) {
+      messageId = data.result.message_id;
+    }
+
+    if (messageId) {
+      const db = readDB();
+      const idx = db.phones.findIndex(p => p.id === phone.id);
+      if (idx !== -1) {
+        db.phones[idx].channel_message_id = messageId;
+        db.phones[idx].channel_kind = kind;
+        writeDB(db);
+      }
+    }
+
+    console.log('✅ Пост в канал отправлен! message_id =', messageId);
+    return messageId;
   } catch (e) {
     console.error('❌ Критическая ошибка при отправке в канал:', e.message);
+    return null;
+  }
+}
+
+async function deleteChannelPost(phone) {
+  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
+  if (!phone.channel_message_id) return;
+  const apiBase = getTelegramApiBase();
+  try {
+    await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: process.env.CHANNEL_ID, message_id: phone.channel_message_id })
+    });
+    console.log('✅ Пост в канале удалён');
+  } catch (e) {
+    console.error('❌ Ошибка удаления поста:', e.message);
+  }
+}
+
+async function syncChannelPost(prev, updated) {
+  if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
+  if (!updated.channel_message_id) return;
+
+  const imagesChanged = JSON.stringify(prev.images || []) !== JSON.stringify(updated.images || []);
+
+  // Фото поменялись — удаляем старый пост и публикуем заново без пинга
+  if (imagesChanged) {
+    await deleteChannelPost(updated);
+    const db = readDB();
+    const idx = db.phones.findIndex(p => p.id === updated.id);
+    if (idx !== -1) {
+      db.phones[idx].channel_message_id = null;
+      db.phones[idx].channel_kind = null;
+      writeDB(db);
+    }
+    await postToChannel(updated, { silent: true });
+    return;
+  }
+
+  // Иначе — правим подпись на месте
+  const apiBase = getTelegramApiBase();
+  const siteUrl = `https://iphone-shop.up.railway.app/?id=${updated.id}`;
+  const caption = buildProductCaption(updated, siteUrl);
+  const kind = updated.channel_kind || 'photo';
+  const endpoint = kind === 'text' ? 'editMessageText' : 'editMessageCaption';
+
+  const payload = kind === 'text'
+    ? { chat_id: process.env.CHANNEL_ID, message_id: updated.channel_message_id, text: caption, parse_mode: 'HTML' }
+    : { chat_id: process.env.CHANNEL_ID, message_id: updated.channel_message_id, caption: caption, parse_mode: 'HTML' };
+
+  try {
+    const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      console.error('❌ Не удалось обновить пост в канале:', data.description);
+      if (/message to edit not found/i.test(data.description || '')) {
+        const db = readDB();
+        const idx = db.phones.findIndex(p => p.id === updated.id);
+        if (idx !== -1) {
+          db.phones[idx].channel_message_id = null;
+          db.phones[idx].channel_kind = null;
+          writeDB(db);
+        }
+      }
+    } else {
+      console.log('✅ Пост в канале обновлён');
+    }
+  } catch (e) {
+    console.error('❌ Ошибка синхронизации поста:', e.message);
   }
 }
 
@@ -432,6 +543,8 @@ app.post('/api/admin/phones', auth, async (req, res) => {
     views: 0,
     orders: 0,
     favorites: 0,
+    channel_message_id: null,
+    channel_kind: null,
     created_at: new Date().toISOString()
   };
   db.phones.unshift(phone);
@@ -466,6 +579,7 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
   db.phones[idx] = updated;
   writeDB(db);
 
+  // Уведомление админу о смене статуса (как было)
   if (updated.status !== prev.status) {
     const labels = { available: 'В наличии', reserved: 'Забронировано', sold: 'Продано', draft: 'Черновик' };
     let msg = `🔄 <b>Статус изменен</b>\n📱 ${esc(updated.brand)} ${esc(updated.model)}\n📌 ${labels[prev.status]} → ${labels[updated.status]}`;
@@ -475,17 +589,35 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
     }
 
     await notify(msg);
-
-    if (updated.status === 'available' && prev.status === 'draft') {
-      await postToChannel(updated);
-    }
   }
+
+  // СИНХРОНИЗАЦИЯ С КАНАЛОМ
+  if (updated.status === 'draft') {
+    if (prev.channel_message_id) {
+      await deleteChannelPost(prev);
+      updated.channel_message_id = null;
+      updated.channel_kind = null;
+      db.phones[idx] = updated;
+      writeDB(db);
+    }
+  } else if (prev.status === 'draft') {
+    // Из черновика в любое видимое состояние — публикуем заново
+    await postToChannel(updated);
+  } else if (updated.channel_message_id) {
+    // Просто правка полей — редактируем пост на месте
+    await syncChannelPost(prev, updated);
+  }
+
   res.json({ ok: true });
 });
 
-app.delete('/api/admin/phones/:id', auth, (req, res) => {
+app.delete('/api/admin/phones/:id', auth, async (req, res) => {
   const id = Number(req.params.id);
   const db = readDB();
+  const phone = db.phones.find(p => p.id === id);
+  if (phone && phone.channel_message_id) {
+    await deleteChannelPost(phone);
+  }
   db.phones = db.phones.filter(p => p.id !== id);
   writeDB(db);
   res.json({ ok: true });
