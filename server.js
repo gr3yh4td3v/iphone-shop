@@ -434,12 +434,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .status.sold      { background: rgba(255, 255, 255, 0.95); color: #b0251f; border: 1px solid rgba(176, 37, 31, 0.2); }
   .hit-badge { position: absolute; top: 16px; left: 16px; background: var(--text); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-transform: uppercase; letter-spacing: 0.5px; }
   
-  /* Кнопка Избранное на картинке */
-  .fav-btn { position: absolute; bottom: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: all 0.2s; }
-  .fav-btn:hover { transform: scale(1.1); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
-  .fav-btn svg { width: 20px; height: 20px; transition: all 0.2s; }
-  .fav-btn.active svg { color: var(--red); }
-
   .card-body { padding: 28px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
   .card-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
   .card-meta { color: #515154; font-size: 15px; font-weight: 500; }
@@ -450,9 +444,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
   
   .price-wrap { display: flex; flex-direction: column; gap: 2px; }
   .price-row { display: flex; align-items: center; gap: 6px; }
-  .price-old { font-size: 14px; color: var(--muted); text-decoration: line-through; font-weight: 500; }
+  .price-old { font-size: 14px; color: var(--muted); text-decoration: line-through; font-weight: 500; white-space: nowrap; }
   .discount-percent-inline { background: var(--red); color: #fff; font-size: 11px; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
-  .price { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+  .price { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .price.discounted { color: var(--red); }
   .timer-label { font-size: 11px; color: var(--red); font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
   
@@ -490,8 +484,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-card .hit-badge, .favorite-card .hit-badge { top: 10px; left: 10px; font-size: 11px; padding: 4px 8px; }
   .recent-card .trust-badges, .favorite-card .trust-badges { display: none; }
   .recent-card .timer-label, .favorite-card .timer-label { display: none; }
-  .recent-card .fav-btn, .favorite-card .fav-btn { width: 32px; height: 32px; bottom: 10px; right: 10px; }
-  .recent-card .fav-btn svg, .favorite-card .fav-btn svg { width: 16px; height: 16px; }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 100; opacity: 0; transition: opacity .3s ease; }
   .modal-overlay.open { display: flex; opacity: 1; }
@@ -519,12 +511,20 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges { display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap; }
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
-  .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
   .detail-price-wrap { display: flex; flex-direction: column; }
-  .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; }
-  .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; }
+  .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; white-space: nowrap; }
+  .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
+  /* Кнопки в детальном окне */
+  .detail-actions { display: flex; align-items: center; gap: 12px; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; }
+  .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
+  .btn-outline.active { color: var(--red); border-color: var(--red); background: rgba(255,59,48,0.05); }
+  .btn-outline svg { width: 20px; height: 20px; transition: all 0.2s; }
+  .btn-outline.active svg { fill: var(--red); }
+
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
   .order-modal h2, .review-modal h2 { font-size: 28px; margin-bottom: 8px; font-weight: 800; letter-spacing: -0.02em; }
   .order-modal p, .review-modal p { color: var(--muted); font-size: 15px; margin-bottom: 24px; }
@@ -597,6 +597,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
+    .detail-bottom { flex-direction: column; align-items: flex-start; }
+    .detail-actions { width: 100%; flex-direction: column; }
+    .detail-actions .btn { width: 100%; }
   }
 </style>
 </head>
@@ -773,7 +776,13 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <div class="detail-price-old" id="detail-price-old" style="display:none;"></div>
           <div class="detail-price" id="detail-price"></div>
         </div>
-        <button class="btn" id="detail-order-btn">Забронировать</button>
+        <div class="detail-actions">
+          <button class="btn btn-outline" id="detail-fav-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+            <span>В избранное</span>
+          </button>
+          <button class="btn" id="detail-order-btn">Забронировать</button>
+        </div>
       </div>
     </div>
   </div>
@@ -885,6 +894,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   var selectedPhone = null;
   var currentActionType = 'order';
   var timersInterval = null;
+  var currentDetailId = null; // ID товара в открытом окне
 
   var grid = document.getElementById('grid');
   var filters = document.getElementById('filters');
@@ -913,8 +923,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   function saveFavorites(favs) {
     localStorage.setItem('favorites', JSON.stringify(favs));
   }
-  function toggleFavorite(id, event) {
-    if (event) event.stopPropagation(); // Не открываем карточку
+  function toggleFavorite(id) {
     var favs = getFavorites();
     if (favs.includes(id)) {
       favs = favs.filter(function(x) { return x !== id; });
@@ -924,7 +933,23 @@ const indexHTML = String.raw`<!DOCTYPE html>
     saveFavorites(favs);
     render();
     renderFavorites();
-    renderRecent(); // Обновляем, чтобы сердечки везде перерисовались
+    renderRecent(); 
+    if (currentDetailId === id) {
+      updateDetailFavBtn(id); // Обновляем кнопку в модальном окне, если оно открыто
+    }
+  }
+
+  function updateDetailFavBtn(id) {
+    var btn = document.getElementById('detail-fav-btn');
+    if (!btn) return;
+    var isFav = getFavorites().includes(id);
+    if (isFav) {
+      btn.classList.add('active');
+      btn.querySelector('span').textContent = 'В избранном';
+    } else {
+      btn.classList.remove('active');
+      btn.querySelector('span').textContent = 'В избранное';
+    }
   }
 
   function setStars(val) {
@@ -1068,11 +1093,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
     var btn = '';
     
-    // Проверяем, в избранном ли товар
-    var isFav = getFavorites().includes(p.id);
-    var heartSvg = '<svg viewBox="0 0 24 24" fill="' + (isFav ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: ' + (isFav ? 'var(--red)' : 'var(--muted)') + ';"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
-    var favBtnHtml = '<div class="fav-btn" data-fav-id="' + p.id + '" title="В избранное">' + heartSvg + '</div>';
-
     if (cardType !== 'mini') {
       if (p.status === 'sold') {
         btn = '<button class="btn" data-notify-btn="' + p.id + '">Уведомить</button>';
@@ -1119,7 +1139,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     if (cardType === 'favorite') cardClass += ' favorite-card';
 
     return '<article class="' + cardClass + '" data-card="' + p.id + '">' +
-      '<div class="card-img">' + img + hitHtml + favBtnHtml +
+      '<div class="card-img">' + img + hitHtml +
         '<span class="status ' + p.status + '">' + STATUS_LABEL[p.status] + '</span>' +
       '</div>' +
       '<div class="card-body">' +
@@ -1244,15 +1264,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
     render();
   });
 
-  // Делегирование кликов для всех сеток (главная, недавние, избранное)
+  // Делегирование кликов для всех сеток
   function handleCardClick(e) {
-    var favBtn = e.target.closest('.fav-btn');
-    if (favBtn) {
-      var id = Number(favBtn.dataset.favId);
-      toggleFavorite(id, e);
-      return;
-    }
-
     var orderBtn = e.target.closest('[data-order-btn]');
     if (orderBtn) {
       e.stopPropagation();
@@ -1280,6 +1293,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     if (!p) return;
     
     trackView(id); 
+    currentDetailId = id; // Сохраняем ID текущего открытого товара
 
     var mainBox = document.getElementById('detail-main-img-box');
     var thumbsBox = document.getElementById('detail-thumbs-box');
@@ -1340,6 +1354,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
     
     document.getElementById('detail-specs').innerHTML = specsHtml || '<div style="grid-column:1/-1; color:var(--muted); font-size:14px;">Характеристики не указаны</div>';
     
+    // Обновляем кнопку "В избранное"
+    updateDetailFavBtn(p.id);
+
     var btn = document.getElementById('detail-order-btn');
     if (p.status === 'sold') {
       btn.disabled = false;
@@ -1360,7 +1377,17 @@ const indexHTML = String.raw`<!DOCTYPE html>
     el.classList.add('active');
   };
 
-  window.closeDetail = function() { detailModal.classList.remove('open'); };
+  window.closeDetail = function() { 
+    detailModal.classList.remove('open'); 
+    currentDetailId = null; 
+  };
+
+  // Обработчик кнопки "В избранное" в модальном окне
+  document.getElementById('detail-fav-btn').addEventListener('click', function() {
+    if (currentDetailId) {
+      toggleFavorite(currentDetailId);
+    }
+  });
 
   function openOrder(id, type) {
     selectedPhone = allPhones.find(function(x) { return x.id === id; });
