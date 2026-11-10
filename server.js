@@ -1564,7 +1564,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
       if (p.images.length > 1) {
         var thumbsHtml = '';
         for (var i = 0; i < p.images.length; i++) {
-                        thumbsHtml += '<img src="' + p.images[i] + '" class="detail-thumb ' + (i===0?'active':'') + '" onclick="changeMainImg(this, ' + i + ')">';
+          thumbsHtml += '<img src="' + p.images[i] + '" class="detail-thumb ' + (i===0?'active':'') + '" onclick="changeMainImg(this, ' + i + ')">';
         }
         thumbsBox.innerHTML = thumbsHtml;
         thumbsBox.style.display = 'flex';
@@ -1838,6 +1838,9 @@ const adminHTML = String.raw`<!DOCTYPE html>
 <title>Админ-панель — iPhone | Shop</title>
 <link rel="icon" type="image/png" href="/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
 <style>
   :root { --bg:#fbfbfd; --card:#fff; --text:#1d1d1f; --muted:#86868b;
     --border:#d2d2d7; --accent:#0071e3; --green:#34c759; --amber:#ff9500; --red:#ff3b30; }
@@ -2106,6 +2109,17 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .custom-select-trigger.status-trigger.sold      { color:#b0251f; border-color:#fecdd3; background-color:#fef2f2; }
   .custom-select-trigger.status-trigger.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
 
+  /* Стили для календаря Flatpickr */
+  .flatpickr-calendar { font-family: 'Inter', sans-serif; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+  .flatpickr-day.selected { background: var(--accent) !important; border-color: var(--accent) !important; }
+  .flatpickr-day:hover { background: #f5f5f7; }
+  .flatpickr-time input:hover, .flatpickr-time .flatpickr-am-pm:hover { background: #f5f5f7; }
+  .flatpickr-calendar.hasTime .flatpickr-time { border-top: 1px solid var(--border); }
+  .flatpickr-months .flatpickr-month { color: var(--text); }
+  .flatpickr-current-month .flatpickr-monthDropdown-months { font-weight: 600; }
+  .flatpickr-weekdays { background: transparent; }
+  span.flatpickr-weekday { color: var(--muted); font-weight: 500; }
+
   @media (max-width:720px) {
     .dashboard { flex-direction: column; }
     .form-grid { grid-template-columns:1fr; }
@@ -2246,7 +2260,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
               </div>
               <div>
                 <label>Скидка сгорит (дата и время) <span id="percent-badge" class="discount-percent-badge" style="display:none;"></span></label>
-                <input name="discount_ends" type="datetime-local">
+                <input name="discount_ends" type="text" id="discount-ends-input" placeholder="Выберите дату и время" autocomplete="off">
               </div>
             </div>
           </div>
@@ -2699,6 +2713,18 @@ const adminHTML = String.raw`<!DOCTYPE html>
   }
 
   var addForm = $('add-form');
+  
+  // Инициализация красивого календаря Flatpickr
+  if (document.getElementById('discount-ends-input')) {
+    flatpickr("#discount-ends-input", {
+      enableTime: true,
+      time_24hr: true,
+      dateFormat: "Y-m-d\\TH:i",
+      locale: "ru",
+      disableMobile: "true"
+    });
+  }
+
   var formMsg = $('form-msg');
   var formTitle = $('form-title');
   var saveBtn = $('save-btn');
