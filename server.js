@@ -2110,7 +2110,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .custom-select-trigger.status-trigger.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
 
   /* Стили для календаря Flatpickr */
-  .flatpickr-calendar { font-family: 'Inter', sans-serif; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+  .flatpickr-calendar { z-index: 9999 !important; font-family: 'Inter', sans-serif; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); border: 1px solid var(--border); }
   .flatpickr-day.selected { background: var(--accent) !important; border-color: var(--accent) !important; }
   .flatpickr-day:hover { background: #f5f5f7; }
   .flatpickr-time input:hover, .flatpickr-time .flatpickr-am-pm:hover { background: #f5f5f7; }
@@ -2119,6 +2119,8 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .flatpickr-current-month .flatpickr-monthDropdown-months { font-weight: 600; }
   .flatpickr-weekdays { background: transparent; }
   span.flatpickr-weekday { color: var(--muted); font-weight: 500; }
+  .flatpickr-monthDropdown-months { background: transparent; }
+  .flatpickr-monthDropdown-months option { background: #fff; color: var(--text); }
 
   @media (max-width:720px) {
     .dashboard { flex-direction: column; }
@@ -2720,8 +2722,11 @@ const adminHTML = String.raw`<!DOCTYPE html>
       enableTime: true,
       time_24hr: true,
       dateFormat: "Y-m-d\\TH:i",
+      altInput: true,
+      altFormat: "d.m.Y H:i",
       locale: "ru",
-      disableMobile: "true"
+      disableMobile: "true",
+      monthSelectorType: "dropdown"
     });
   }
 
