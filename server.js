@@ -70,6 +70,53 @@ function dataURItoBlob(dataURI) {
   return new Blob([ab], { type: mimeString });
 }
 
+// Отправка красивого уведомления тебе в личку о новом товаре
+async function notifyProductAdded(phone) {
+  if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) return;
+  const apiBase = getTelegramApiBase();
+  const siteUrl = `https://iphone-shop.up.railway.app/?id=${phone.id}`;
+  
+  const text = `➕ <b>Добавлен товар</b>\n\n` +
+               `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
+               `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}\n` +
+               `🔋 АКБ: ${esc(phone.battery) || '—'}%\n` +
+               `🏷️ Состояние: ${esc(phone.condition) || '—'}\n` +
+               `💰 Цена: <b>${Number(phone.price).toLocaleString('ru-RU')} ₽</b>\n` +
+               (phone.imei ? `🔑 IMEI: ${esc(phone.imei)}\n` : '') +
+               `\n👉 <a href="${siteUrl}">Посмотреть на сайте</a>`;
+
+  try {
+    const formData = new FormData();
+    formData.append('chat_id', process.env.CHAT_ID);
+    const images = phone.images || [];
+    let endpoint = 'sendMessage';
+
+    if (images.length === 0) {
+      formData.append('text', text);
+      formData.append('parse_mode', 'HTML');
+    } else if (images.length === 1) {
+      endpoint = 'sendPhoto';
+      formData.append('photo', dataURItoBlob(images[0]), 'photo.jpg');
+      formData.append('caption', text);
+      formData.append('parse_mode', 'HTML');
+    } else {
+      endpoint = 'sendMediaGroup';
+      const mediaArray = [];
+      for (let i = 0; i < images.length; i++) {
+        formData.append(`file${i}`, dataURItoBlob(images[i]), `photo${i}.jpg`);
+        mediaArray.push({ type: 'photo', media: `attach://file${i}`, ...(i === 0 ? { caption: text, parse_mode: 'HTML' } : {}) });
+      }
+      formData.append('media', JSON.stringify(mediaArray));
+    }
+
+    const res = await fetch(`${apiBase}/bot${process.env.BOT_TOKEN}/${endpoint}`, { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!data.ok) console.error('❌ Ошибка Telegram (личка):', data.description);
+  } catch (e) {
+    console.error('❌ Критическая ошибка при отправке в личку:', e.message);
+  }
+}
+
 async function postToChannel(phone) {
   if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
   const apiBase = getTelegramApiBase();
@@ -341,7 +388,7 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   writeDB(db);
 
   if (finalStatus !== 'draft') {
-    await notify(`➕ <b>Добавлен товар</b>\n📱 ${esc(brand)} ${esc(model)}\n💰 Цена: ${Number(price).toLocaleString('ru-RU')} ₽`);
+    await notifyProductAdded(phone); // Новое подробное уведомление с фото
     await postToChannel(phone);
   }
 
