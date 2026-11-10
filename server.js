@@ -25,6 +25,7 @@ function readDB() {
       if (p.orders === undefined) p.orders = 0;
       if (p.is_hit === undefined) p.is_hit = false;
       if (p.status === undefined) p.status = 'available';
+      if (p.favorites === undefined) p.favorites = 0; // Новое поле для избранного
     });
 
     return data;
@@ -131,6 +132,23 @@ function auth(req, res, next) {
 app.get('/api/phones', (req, res) => {
   const phones = readDB().phones.filter(p => p.status !== 'draft');
   res.json(phones);
+});
+
+// Новый API для отслеживания избранного
+app.post('/api/phone/:id/favorite', (req, res) => {
+  const id = Number(req.params.id);
+  const { action } = req.body; // 'add' или 'remove'
+  const db = readDB();
+  const phone = db.phones.find(p => p.id === id);
+  if (phone) {
+    if (action === 'add') {
+      phone.favorites = (phone.favorites || 0) + 1;
+    } else if (action === 'remove' && phone.favorites > 0) {
+      phone.favorites--;
+    }
+    writeDB(db);
+  }
+  res.json({ ok: true });
 });
 
 app.get('/api/reviews', (req, res) => {
@@ -248,10 +266,10 @@ app.get('/api/admin/auth/telegram', (req, res) => {
 
 app.get('/api/admin/export', auth, (req, res) => {
   const db = readDB();
-  let csv = 'ID;Бренд;Модель;Цена;Просмотры;Заявки;Статус;Дата\n';
+  let csv = 'ID;Бренд;Модель;Цена;Просмотры;Заявки;Избранное;Статус;Дата\n';
   db.phones.forEach(p => {
     const clean = (s) => '"' + String(s || '').replace(/"/g, '""') + '"';
-    csv += `${p.id};${clean(p.brand)};${clean(p.model)};${p.price};${p.views||0};${p.orders||0};${p.status};${clean(new Date(p.created_at).toLocaleString('ru-RU'))}\n`;
+    csv += `${p.id};${clean(p.brand)};${clean(p.model)};${p.price};${p.views||0};${p.orders||0};${p.favorites||0};${p.status};${clean(new Date(p.created_at).toLocaleString('ru-RU'))}\n`;
   });
   
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -318,6 +336,7 @@ app.post('/api/admin/phones', auth, async (req, res) => {
     status: finalStatus,
     views: 0,
     orders: 0,
+    favorites: 0, // Инициализируем счетчик избранного
     created_at: new Date().toISOString()
   };
   db.phones.unshift(phone);
@@ -479,7 +498,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-card .card-body, .favorite-card .card-body { padding: 16px; }
   .recent-card .card-title, .favorite-card .card-title { font-size: 16px; }
   .recent-card .price, .favorite-card .price { font-size: 20px; }
-  .recent-card .btn, .favorite-card .btn { padding: 8px 12px; font-size: 13px; }
+  
+  /* Убираем кнопки в маленьких карточках, чтобы не ломать верстку */
+  .recent-card .btn, .favorite-card .btn { display: none !important; }
+  .recent-card .card-footer, .favorite-card .card-footer { justify-content: flex-start; }
   .recent-card .status, .favorite-card .status { top: 10px; right: 10px; font-size: 11px; padding: 6px 10px; }
   .recent-card .hit-badge, .favorite-card .hit-badge { top: 10px; left: 10px; font-size: 11px; padding: 4px 8px; }
   .recent-card .trust-badges, .favorite-card .trust-badges { display: none; }
@@ -591,7 +613,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .recent-card, .favorite-card { min-width: 180px; max-width: 180px; }
     .recent-card .card-title, .favorite-card .card-title { font-size: 14px; }
     .recent-card .price, .favorite-card .price { font-size: 16px; }
-    .recent-card .btn, .favorite-card .btn { display: none; }
     .logo img { height: 32px; }
     .logo span { font-size: 18px; }
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
@@ -894,7 +915,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   var selectedPhone = null;
   var currentActionType = 'order';
   var timersInterval = null;
-  var currentDetailId = null; // ID товара в открытом окне
+  var currentDetailId = null;
 
   var grid = document.getElementById('grid');
   var filters = document.getElementById('filters');
@@ -925,17 +946,27 @@ const indexHTML = String.raw`<!DOCTYPE html>
   }
   function toggleFavorite(id) {
     var favs = getFavorites();
+    var action = 'add';
     if (favs.includes(id)) {
       favs = favs.filter(function(x) { return x !== id; });
+      action = 'remove';
     } else {
       favs.push(id);
     }
     saveFavorites(favs);
+
+    // Отправляем сигнал на сервер для статистики
+    fetch('/api/phone/' + id + '/favorite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action })
+    });
+
     render();
     renderFavorites();
     renderRecent(); 
     if (currentDetailId === id) {
-      updateDetailFavBtn(id); // Обновляем кнопку в модальном окне, если оно открыто
+      updateDetailFavBtn(id);
     }
   }
 
@@ -1293,7 +1324,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     if (!p) return;
     
     trackView(id); 
-    currentDetailId = id; // Сохраняем ID текущего открытого товара
+    currentDetailId = id;
 
     var mainBox = document.getElementById('detail-main-img-box');
     var thumbsBox = document.getElementById('detail-thumbs-box');
@@ -1354,7 +1385,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     
     document.getElementById('detail-specs').innerHTML = specsHtml || '<div style="grid-column:1/-1; color:var(--muted); font-size:14px;">Характеристики не указаны</div>';
     
-    // Обновляем кнопку "В избранное"
     updateDetailFavBtn(p.id);
 
     var btn = document.getElementById('detail-order-btn');
@@ -1382,7 +1412,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     currentDetailId = null; 
   };
 
-  // Обработчик кнопки "В избранное" в модальном окне
   document.getElementById('detail-fav-btn').addEventListener('click', function() {
     if (currentDetailId) {
       toggleFavorite(currentDetailId);
@@ -1666,9 +1695,10 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .btn-success:hover { background:#c8e6c9; }
   
   /* Dashboard */
-  .dashboard { display: flex; gap: 20px; margin-bottom: 40px; }
-  .stat-card { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid var(--border); flex: 1; font-size: 14px; color: var(--muted); display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+  .dashboard { display: flex; gap: 20px; margin-bottom: 40px; flex-wrap: wrap; }
+  .stat-card { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid var(--border); flex: 1; min-width: 150px; font-size: 14px; color: var(--muted); display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
   .stat-card span { display: block; font-size: 28px; font-weight: 800; color: var(--text); margin-top: 4px; }
+  .stat-card.fav span { color: var(--red); }
   .dashboard-actions { display: flex; align-items: center; }
 
   .tabs { display: flex; gap: 10px; margin-bottom: 32px; border-bottom: 1px solid var(--border); }
@@ -1726,6 +1756,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .phone-name { font-weight:700; font-size:17px; margin-bottom:6px; letter-spacing:-0.01em; display: flex; align-items: center; gap: 8px; }
   .phone-meta { color:var(--muted); font-size:14px; margin-bottom: 4px; }
   .phone-stats { font-size: 12px; color: #0071e3; font-weight: 600; display: flex; gap: 12px; }
+  .phone-stats .fav-stat { color: var(--red); } /* Красный цвет для избранного */
   .phone-price { font-weight:700; font-size:18px; white-space:nowrap; letter-spacing:-0.02em; display: flex; flex-direction: column; }
   .old-price-strike { text-decoration: line-through; color: var(--muted); font-size: 13px; font-weight: 500; }
   .phone-actions { display:flex; gap:10px; align-items:center; }
@@ -1904,6 +1935,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
       <div class="stat-card">Всего товаров <span id="stat-total">0</span></div>
       <div class="stat-card">Всего просмотров <span id="stat-views">0</span></div>
       <div class="stat-card">Всего заявок <span id="stat-orders">0</span></div>
+      <div class="stat-card fav">В избранном <span id="stat-favs">0</span></div>
       <div class="dashboard-actions">
         <button class="btn" style="height: 100%; font-size: 15px;" onclick="exportCSV()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: middle;">
@@ -2246,9 +2278,11 @@ const adminHTML = String.raw`<!DOCTYPE html>
     var total = phones.length;
     var views = phones.reduce((acc, p) => acc + (p.views || 0), 0);
     var orders = phones.reduce((acc, p) => acc + (p.orders || 0), 0);
+    var favs = phones.reduce((acc, p) => acc + (p.favorites || 0), 0);
     $('stat-total').textContent = total;
     $('stat-views').textContent = views;
     $('stat-orders').textContent = orders;
+    $('stat-favs').textContent = favs;
   }
 
   async function loadReviews() {
@@ -2281,6 +2315,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
       var statsHtml = '<div class="phone-stats">' +
         '<span>Просмотры: ' + (p.views || 0) + '</span>' +
         '<span>Заявки: ' + (p.orders || 0) + '</span>' +
+        '<span class="fav-stat">❤️ В избранном: ' + (p.favorites || 0) + '</span>' +
       '</div>';
 
       var hitHtml = p.is_hit ? '<span class="admin-hit-badge">ХИТ</span>' : '';
