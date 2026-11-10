@@ -740,7 +740,17 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-content { flex: 1; padding: 48px; display: flex; flex-direction: column; overflow-y: auto; }
   .detail-close { position: absolute; top: 24px; right: 24px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0,0,0,0.05); color: var(--text); font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s; z-index: 10; }
   .detail-close:hover { background: rgba(0,0,0,0.1); }
-  .detail-title { font-size: 32px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.03em; line-height: 1.2; }
+  
+  /* НОВАЯ ШАПКА С ИКОНКАМИ */
+  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }
+  .detail-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; margin-bottom: 0; }
+  .detail-icon-actions { display: flex; gap: 8px; flex-shrink: 0; margin-top: 4px; }
+  .btn-icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; padding: 0; }
+  .btn-icon:hover { background: #f5f5f7; border-color: #a1a1a6; }
+  .btn-icon svg { width: 20px; height: 20px; }
+  .btn-icon.active { color: var(--red); border-color: var(--red); background: rgba(255,59,48,0.05); }
+  .btn-icon.active svg { fill: var(--red); }
+
   .detail-meta { color: var(--muted); font-size: 16px; margin-bottom: 32px; }
   .specs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; background: #fbfbfd; padding: 24px; border-radius: 20px; border: 1px solid var(--border); }
   .spec-item { display: flex; flex-direction: column; gap: 4px; }
@@ -759,17 +769,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  /* ИСПРАВЛЕННЫЕ КНОПКИ (только В избранное и Забронировать) */
-  .detail-actions { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 380px; }
-  .detail-actions .btn { justify-content: center; padding: 12px 10px; font-size: 14px; }
-  .detail-actions .btn-outline { flex: 1; }
-  .detail-actions .btn:last-child { flex: 2; }
-  
-  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 6px; }
-  .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
-  .btn-outline.active { color: var(--red); border-color: var(--red); background: rgba(255,59,48,0.05); }
-  .btn-outline svg { width: 18px; height: 18px; transition: all 0.2s; }
-  .btn-outline.active svg { fill: var(--red); }
+  /* КНОПКА ЗАБРОНИРОВАТЬ ВНИЗУ */
+  .detail-actions { display: flex; width: 100%; max-width: 380px; }
+  .detail-actions .btn { width: 100%; justify-content: center; padding: 16px; font-size: 16px; }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
   .order-modal h2, .review-modal h2 { font-size: 28px; margin-bottom: 8px; font-weight: 800; letter-spacing: -0.02em; }
@@ -842,6 +844,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
+    .detail-header { flex-direction: column; gap: 12px; }
+    .detail-icon-actions { margin-top: 0; }
     .detail-bottom { flex-direction: column; align-items: flex-start; }
     .detail-actions { max-width: 100%; }
   }
@@ -985,20 +989,26 @@ const indexHTML = String.raw`<!DOCTYPE html>
       <div class="detail-thumbnails" id="detail-thumbs-box"></div>
     </div>
     <div class="detail-content">
-      <div class="detail-title" id="detail-title"></div>
       
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 32px;">
-        <div class="detail-meta" id="detail-meta" style="margin-bottom: 0;"></div>
-        <button class="btn btn-outline" id="detail-share-btn" style="padding: 8px 16px; font-size: 13px; border-radius: 12px; flex-shrink: 0; width: auto;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
-            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-            <polyline points="16 6 12 2 8 6"></polyline>
-            <line x1="12" y1="2" x2="12" y2="15"></line>
-          </svg>
-          <span>Поделиться</span>
-        </button>
+      <!-- НОВАЯ ШАПКА С ИКОНКАМИ -->
+      <div class="detail-header">
+        <div class="detail-title" id="detail-title"></div>
+        <div class="detail-icon-actions">
+          <button class="btn-icon" id="detail-share-btn" title="Поделиться">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+              <polyline points="16 6 12 2 8 6"></polyline>
+              <line x1="12" y1="2" x2="12" y2="15"></line>
+            </svg>
+          </button>
+          <button class="btn-icon" id="detail-fav-btn" title="В избранное">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          </button>
+        </div>
       </div>
 
+      <div class="detail-meta" id="detail-meta"></div>
+      
       <div class="specs-grid" id="detail-specs"></div>
       
       <div class="detail-desc" id="detail-desc"></div>
@@ -1031,10 +1041,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <div class="detail-price" id="detail-price"></div>
         </div>
         <div class="detail-actions">
-          <button class="btn btn-outline" id="detail-fav-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-            <span>В избранное</span>
-          </button>
           <button class="btn" id="detail-order-btn">Забронировать</button>
         </div>
       </div>
@@ -1205,10 +1211,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var isFav = getFavorites().includes(id);
     if (isFav) {
       btn.classList.add('active');
-      btn.querySelector('span').textContent = 'В избранном';
+      btn.title = 'Убрать из избранного';
     } else {
       btn.classList.remove('active');
-      btn.querySelector('span').textContent = 'В избранное';
+      btn.title = 'В избранное';
     }
   }
 
@@ -1657,12 +1663,15 @@ const indexHTML = String.raw`<!DOCTYPE html>
     shareText += '💰 Всего ' + priceFormatted + '\n\n';
     shareText += '👉 Подробнее: ' + shareUrl;
 
-    const btnSpan = this.querySelector('span');
-    const originalText = btnSpan.textContent;
+    const originalIcon = this.innerHTML;
 
     const successCopy = () => {
-      btnSpan.textContent = 'Скопировано!';
-      setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
+      this.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#1a7f37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      this.style.borderColor = '#1a7f37';
+      setTimeout(() => { 
+        this.innerHTML = originalIcon; 
+        this.style.borderColor = ''; 
+      }, 2000);
     };
 
     const forceCopy = () => {
@@ -1686,8 +1695,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
           document.execCommand('copy');
           successCopy();
         } catch (err) {
-          btnSpan.textContent = 'Ошибка копирования';
-          setTimeout(() => { btnSpan.textContent = originalText; }, 2000);
+          // Игнорируем ошибку
         }
         document.body.removeChild(textarea);
       }
