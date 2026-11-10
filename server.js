@@ -741,7 +741,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-close { position: absolute; top: 24px; right: 24px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0,0,0,0.05); color: var(--text); font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s; z-index: 10; }
   .detail-close:hover { background: rgba(0,0,0,0.1); }
   
-  /* НОВАЯ ШАПКА С ИКОНКАМИ */
   .detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }
   .detail-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; margin-bottom: 0; }
   .detail-icon-actions { display: flex; gap: 8px; flex-shrink: 0; margin-top: 4px; }
@@ -769,9 +768,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  /* КНОПКА ЗАБРОНИРОВАТЬ ВНИЗУ */
-  .detail-actions { display: flex; width: 100%; max-width: 380px; }
-  .detail-actions .btn { width: 100%; justify-content: center; padding: 16px; font-size: 16px; }
+  /* ШИРОКАЯ КНОПКА ЗАБРОНИРОВАТЬ */
+  .detail-actions { display: flex; width: 100%; }
+  @media(min-width: 768px) { .detail-actions { width: auto; min-width: 300px; } }
+  .detail-actions .btn { width: 100%; justify-content: center; padding: 16px 32px; font-size: 16px; }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
   .order-modal h2, .review-modal h2 { font-size: 28px; margin-bottom: 8px; font-weight: 800; letter-spacing: -0.02em; }
@@ -895,8 +895,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <div class="custom-option" data-value="newest">Сначала новые</div>
         </div>
       </div>
-
-      <button class="btn btn-secondary" onclick="scrollToReviews()" style="border-radius: 100px; padding: 14px 24px; font-weight: 500;">Читать отзывы</button>
     </div>
 
     <div class="filters" id="filters">
@@ -960,7 +958,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
         <h4>Компания</h4>
         <ul>
           <li><a onclick="showInfo('about')">О нас</a></li>
-          <li><a onclick="scrollToReviews()">Читать отзывы</a></li>
+          <li><a onclick="scrollToReviews()">Отзывы</a></li>
           <li><a onclick="showInfo('contacts')">Контакты</a></li>
         </ul>
       </div>
@@ -990,7 +988,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     </div>
     <div class="detail-content">
       
-      <!-- НОВАЯ ШАПКА С ИКОНКАМИ -->
       <div class="detail-header">
         <div class="detail-title" id="detail-title"></div>
         <div class="detail-icon-actions">
