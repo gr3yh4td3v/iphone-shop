@@ -96,7 +96,6 @@ function formatPrice(phone) {
 
 function buildProductCaption(phone, siteUrl) {
   let header;
-  // Меняем эмодзи в зависимости от статуса
   if (phone.status === 'sold')          header = `❌ <b>Продано</b>`;
   else if (phone.status === 'reserved') header = `⏳ <b>Забронировано</b>`;
   else                                  header = `🔥 <b>Новое поступление!</b>`;
@@ -266,7 +265,6 @@ async function syncChannelPost(prev, updated) {
 
   const imagesChanged = JSON.stringify(prev.images || []) !== JSON.stringify(updated.images || []);
 
-  // Фото поменялись — удаляем старый пост и публикуем заново без пинга
   if (imagesChanged) {
     await deleteChannelPost(updated);
     const db = readDB();
@@ -280,7 +278,6 @@ async function syncChannelPost(prev, updated) {
     return;
   }
 
-  // Иначе — правим подпись на месте
   const apiBase = getTelegramApiBase();
   const siteUrl = `https://iphone-shop.up.railway.app/?id=${updated.id}`;
   const caption = buildProductCaption(updated, siteUrl);
@@ -332,7 +329,6 @@ function auth(req, res, next) {
 // ============================================================
 //                         PUBLIC API
 // ============================================================
-// Этот роут отдает товары на САЙТ (без черновиков)
 app.get('/api/phones', (req, res) => {
   const phones = readDB().phones.filter(p => p.status !== 'draft');
   res.json(phones);
@@ -445,7 +441,6 @@ app.post('/api/order', async (req, res) => {
 // ============================================================
 //                        ADMIN API
 // ============================================================
-// Этот роут отдает товары в АДМИНКУ (со всеми черновиками)
 app.get('/api/admin/phones', auth, (req, res) => {
   res.json(readDB().phones);
 });
@@ -580,7 +575,6 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
   db.phones[idx] = updated;
   writeDB(db);
 
-  // Уведомление админу о смене статуса (как было)
   if (updated.status !== prev.status) {
     const labels = { available: 'В наличии', reserved: 'Забронировано', sold: 'Продано', draft: 'Черновик' };
     let msg = `🔄 <b>Статус изменен</b>\n📱 ${esc(updated.brand)} ${esc(updated.model)}\n📌 ${labels[prev.status]} → ${labels[updated.status]}`;
@@ -592,7 +586,6 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
     await notify(msg);
   }
 
-  // СИНХРОНИЗАЦИЯ С КАНАЛОМ
   if (updated.status === 'draft') {
     if (prev.channel_message_id) {
       await deleteChannelPost(prev);
@@ -602,10 +595,8 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
       writeDB(db);
     }
   } else if (prev.status === 'draft') {
-    // Из черновика в любое видимое состояние — публикуем заново
     await postToChannel(updated);
   } else if (updated.channel_message_id) {
-    // Просто правка полей — редактируем пост на месте
     await syncChannelPost(prev, updated);
   }
 
@@ -715,7 +706,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .review-text { font-size: 14px; color: #444; line-height: 1.5; font-style: italic; }
   .review-date { font-size: 12px; color: var(--muted); margin-top: auto; }
 
-  /* Секции недавно просмотренных и избранного */
   .recent-section, .favorites-section { padding-bottom: 80px; display: none; }
   .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
   .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
@@ -727,12 +717,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-card .card-title, .favorite-card .card-title { font-size: 16px; }
   .recent-card .price, .favorite-card .price { font-size: 20px; }
   
-  /* Убираем кнопки в маленьких карточках для чистоты дизайна */
   .recent-card .btn, .favorite-card .btn { display: none !important; }
-  .recent-card .card-footer, .favorite-card .card-footer { 
-    justify-content: flex-start; 
-    padding-top: 8px;
-  }
+  .recent-card .card-footer, .favorite-card .card-footer { justify-content: flex-start; padding-top: 8px; }
   .recent-card .status, .favorite-card .status { top: 10px; right: 10px; font-size: 11px; padding: 6px 10px; }
   .recent-card .hit-badge, .favorite-card .hit-badge { top: 10px; left: 10px; font-size: 11px; padding: 4px 8px; }
   .recent-card .trust-badges, .favorite-card .trust-badges { display: none; }
@@ -770,7 +756,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  /* Кнопки в детальном окне */
   .detail-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; }
   .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
@@ -911,7 +896,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     
     <div class="grid" id="grid"></div>
 
-    <!-- НОВАЯ СЕКЦИЯ: ИЗБРАННОЕ -->
     <div class="favorites-section" id="favorites-section">
       <div class="favorites-header">
         <div class="favorites-title">Избранное</div>
@@ -919,7 +903,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
       <div class="favorites-grid" id="favorites-grid"></div>
     </div>
 
-    <!-- Секция: Вы недавно смотрели -->
     <div class="recent-section" id="recent-section">
       <div class="recent-header">
         <div class="recent-title">Вы недавно смотрели</div>
@@ -985,7 +968,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   </div>
 </footer>
 
-<!-- DETAIL MODAL -->
 <div class="modal-overlay" id="detail-modal" onclick="if(event.target===this) closeDetail()">
   <div class="modal detail-modal">
     <button class="detail-close" onclick="closeDetail()">×</button>
@@ -1048,7 +1030,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   </div>
 </div>
 
-<!-- ORDER MODAL -->
 <div class="modal-overlay" id="order-modal" onclick="if(event.target===this) closeOrder()">
   <form class="modal order-modal" id="order-form">
     <h2 id="modal-title">Оформление заявки</h2>
@@ -1080,7 +1061,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   </form>
 </div>
 
-<!-- REVIEW MODAL -->
 <div class="modal-overlay" id="review-modal" onclick="if(event.target===this) closeReview()">
   <form class="modal review-modal" id="review-form">
     <h2>Оставить отзыв</h2>
@@ -1134,7 +1114,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   </form>
 </div>
 
-<!-- INFO MODAL -->
 <div class="modal-overlay" id="info-modal" onclick="if(event.target===this) closeInfo()">
   <div class="modal info-modal">
     <h2 id="info-title"></h2>
@@ -1176,7 +1155,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   var stars = document.querySelectorAll('#star-rating .star');
   var ratingInput = document.getElementById('rating-input');
 
-  // --- ИЗБРАННОЕ ---
   function getFavorites() {
     try { return JSON.parse(localStorage.getItem('favorites') || '[]'); } catch(e) { return []; }
   }
@@ -1362,7 +1340,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
     var btn = '';
     
-    // Кнопку рендерим только для основной сетки
     if (cardType === 'main') {
       if (p.status === 'sold') {
         btn = '<button class="btn" data-notify-btn="' + p.id + '">Уведомить</button>';
@@ -1534,7 +1511,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     render();
   });
 
-  // Делегирование кликов для всех сеток
   function handleCardClick(e) {
     var orderBtn = e.target.closest('[data-order-btn]');
     if (orderBtn) {
@@ -1653,36 +1629,31 @@ const indexHTML = String.raw`<!DOCTYPE html>
     currentDetailId = null; 
   };
 
-  // SHARE BUTTON LOGIC
   document.getElementById('detail-share-btn').addEventListener('click', async function() {
     if (!currentDetailId) return;
     const p = allPhones.find(x => x.id === currentDetailId);
     if (!p) return;
 
-    const shareText = `Смотри какой аппарат: ${p.brand} ${p.model} за ${Number(p.price).toLocaleString('ru-RU')} ₽`;
-    const shareUrl = `${window.location.origin}/?id=${p.id}`;
+    const shareText = 'Смотри какой аппарат: ' + p.brand + ' ' + p.model + ' за ' + Number(p.price).toLocaleString('ru-RU') + ' ₽';
+    const shareUrl = window.location.origin + '/?id=' + p.id;
     const btnSpan = this.querySelector('span');
 
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${p.brand} ${p.model}`,
+          title: p.brand + ' ' + p.model,
           text: shareText,
           url: shareUrl
         });
-      } catch (err) {
-        // Игнорируем ошибку, если пользователь передумал делиться
-      }
+      } catch (err) {}
     } else {
-      // Фоллбэк для ПК
       try {
-        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        await navigator.clipboard.writeText(shareText + '\n' + shareUrl);
         btnSpan.textContent = 'Скопировано!';
         setTimeout(() => { btnSpan.textContent = 'Поделиться'; }, 2000);
       } catch (err) {
-        // Старый фоллбэк для http
         const tempInput = document.createElement('input');
-        tempInput.value = `${shareText}\n${shareUrl}`;
+        tempInput.value = shareText + '\n' + shareUrl;
         document.body.appendChild(tempInput);
         tempInput.select();
         document.execCommand('copy');
@@ -1895,7 +1866,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
     --border:#d2d2d7; --accent:#0071e3; --green:#34c759; --amber:#ff9500; --red:#ff3b30; }
   * { box-sizing:border-box; margin:0; padding:0; }
   
-  /* Жестко убиваем стрелочки у ВСЕХ числовых полей в браузере */
   input[type=number]::-webkit-inner-spin-button, 
   input[type=number]::-webkit-outer-spin-button { 
     -webkit-appearance: none !important; 
@@ -1912,10 +1882,8 @@ const adminHTML = String.raw`<!DOCTYPE html>
   body { font-family:'Inter', -apple-system, sans-serif; background:var(--bg); color:var(--text); }
   .container { max-width:1100px; margin:0 auto; padding:0 20px; }
   
-  /* Анимированный фон для страницы входа */
   .login-screen { min-height:100vh; display:flex; align-items:center; justify-content:center; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding:20px; }
   
-  /* Анимация появления карточки */
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(30px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1925,13 +1893,11 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .login-box h1 { font-size:24px; margin-bottom:8px; font-weight:700; letter-spacing:-0.02em; }
   .login-box p { color:var(--muted); font-size:14px; margin-bottom:24px; }
   
-  /* Стили поля ввода с красивым фокусом */
   .login-box input { width:100%; padding:14px 16px; border:1px solid var(--border); background:#fafafa; border-radius:12px; font-size:15px; margin-bottom:16px; font-family:inherit; outline:none; transition:all .3s; }
   .login-box input:focus { border-color:var(--accent); background:#fff; box-shadow: 0 0 0 4px rgba(0,113,227,0.1); }
   
   .login-err { color:var(--red); font-size:13px; text-align:center; margin-top:12px; min-height:20px; }
   
-  /* Контейнер для кнопки Telegram с анимацией */
   .tg-widget-wrap { 
     display: flex; 
     justify-content: center; 
@@ -1956,7 +1922,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
     border-radius: 12px !important;
   }
   
-  /* Красивый разделитель */
   .divider { display: flex; align-items: center; text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 20px; }
   .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
   .divider::before { margin-right: 10px; }
@@ -1983,7 +1948,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .btn-success { background:#e8f5e9; color:#1a7f37; }
   .btn-success:hover { background:#c8e6c9; }
   
-  /* Dashboard */
   .dashboard { display: flex; gap: 20px; margin-bottom: 40px; flex-wrap: wrap; }
   .stat-card { background: #fff; border-radius: 16px; padding: 20px; border: 1px solid var(--border); flex: 1; min-width: 150px; font-size: 14px; color: var(--muted); display: flex; flex-direction: column; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
   .stat-card span { display: block; font-size: 28px; font-weight: 800; color: var(--text); margin-top: 4px; }
@@ -2046,7 +2010,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .phone-meta { color:var(--muted); font-size:14px; margin-bottom: 4px; }
   .phone-stats { font-size: 12px; color: #0071e3; font-weight: 600; display: flex; gap: 12px; align-items: center; }
   
-  /* Стили для иконки избранного в админке */
   .fav-stat { color: var(--red); display: flex; align-items: center; gap: 4px; }
   .fav-icon { width: 14px; height: 14px; fill: currentColor; }
 
@@ -2089,7 +2052,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .hit-checkbox-wrap input[type=checkbox] { width: 20px; height: 20px; cursor: pointer; accent-color: var(--text); }
   .hit-checkbox-wrap label { margin: 0; cursor: pointer; font-size: 15px; font-weight: 500; display: flex; align-items: center; }
 
-  /* Стили для кастомного селекта */
   .custom-select-wrapper { position: relative; user-select: none; width: 100%; }
   
   .custom-select-trigger { 
@@ -2149,7 +2111,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .custom-select-option:hover { background: #f5f5f7; }
   .custom-select-option.selected { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
 
-  /* Специфичные стили для статуса */
   .custom-select-trigger.status-trigger { 
     padding: 10px 14px; 
     border-radius: 10px; 
@@ -2163,7 +2124,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .custom-select-trigger.status-trigger.sold      { color:#b0251f; border-color:#fecdd3; background-color:#fef2f2; }
   .custom-select-trigger.status-trigger.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
 
-  /* БЕЗЖАЛОСТНЫЙ ФИКС ДЛЯ FLATPICKR */
   .flatpickr-calendar { 
     z-index: 9999 !important; 
     font-family: 'Inter', sans-serif !important; 
@@ -2173,13 +2133,11 @@ const adminHTML = String.raw`<!DOCTYPE html>
     padding: 5px;
   }
   
-  /* Убираем все дефолтные стрелочки в flatpickr (года и времени) */
   .flatpickr-current-month .numInputWrapper span,
   .flatpickr-time .numInputWrapper span {
     display: none !important;
   }
   
-  /* Убираем нативные браузерные стрелки в полях ввода flatpickr */
   .flatpickr-current-month input.cur-year,
   .flatpickr-time input {
     -moz-appearance: textfield !important;
@@ -2197,7 +2155,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
     display: none !important;
   }
   
-  /* Центрируем месяц и год */
   .flatpickr-current-month {
     font-size: 15px !important;
     font-weight: 600 !important;
@@ -2226,7 +2183,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
     line-height: 40px !important;
   }
 
-  /* Делаем идеально ровный круг для выбранной даты */
   .flatpickr-day.selected, 
   .flatpickr-day.startRange, 
   .flatpickr-day.endRange, 
@@ -2285,7 +2241,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
     <h1>Админ-панель</h1>
     <p>Войдите с помощью Telegram или введите пароль</p>
 
-    <!-- Кнопка Telegram с фиксом черных углов -->
     <div class="tg-widget-wrap">
       <script async src="https://telegram.org/js/telegram-widget.js?22" 
         data-telegram-login="ShopysiPhonesBot" 
@@ -2324,7 +2279,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
     
     <h1 class="page-title">Управление магазином</h1>
 
-    <!-- ДАШБОРД -->
     <div class="dashboard">
       <div class="stat-card">Всего товаров <span id="stat-total">0</span></div>
       <div class="stat-card">Всего просмотров <span id="stat-views">0</span></div>
@@ -2347,7 +2301,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
       <button class="tab" onclick="switchTab('reviews')">Отзывы</button>
     </div>
 
-    <!-- Вкладка Товары -->
     <div id="tab-phones" class="tab-content active">
       <form class="form-card" id="add-form">
         <h2 id="form-title">Добавить телефон</h2>
@@ -2492,7 +2445,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
       <div class="phone-list" id="phone-list"></div>
     </div>
 
-    <!-- Вкладка Отзывы -->
     <div id="tab-reviews" class="tab-content">
       <div class="review-list" id="review-list"></div>
     </div>
@@ -2638,7 +2590,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
     location.reload();
   };
 
-  // Проверка параметров URL после редиректа от Telegram
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('telegram_auth') === '1') {
     localStorage.setItem('admin_pw', 'telegram_auth_success');
@@ -2662,7 +2613,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
   };
 
   async function loadPhones() {
-    // ИСПОЛЬЗУЕМ НОВЫЙ РОУТ ДЛЯ АДМИНКИ И СБРАСЫВАЕМ КЭШ
     var r = await api('/api/admin/phones?_t=' + Date.now());
     phones = await r.json();
     renderList();
@@ -2777,11 +2727,10 @@ const adminHTML = String.raw`<!DOCTYPE html>
     list.innerHTML = html;
   }
 
-  // Функция для превращения нативных селектов в красивые
   function initCustomSelects() {
     document.querySelectorAll('select:not(.customized)').forEach(select => {
       select.classList.add('customized');
-      select.style.display = 'none'; // Скрываем нативный селект
+      select.style.display = 'none';
       
       const wrapper = document.createElement('div');
       wrapper.className = 'custom-select-wrapper';
@@ -2789,7 +2738,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
       const trigger = document.createElement('div');
       trigger.className = 'custom-select-trigger';
       
-      // Если это селект статуса, добавляем ему классы для цветов
       if (select.classList.contains('status-select')) {
         trigger.classList.add('status-trigger');
         trigger.classList.add(select.classList[1] || 'available');
@@ -2823,7 +2771,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
           trigger.classList.remove('open');
           optionsContainer.classList.remove('open');
           
-          // ВАЖНО: Добавляем bubbles: true, чтобы событие "всплыло" до обработчика
           select.dispatchEvent(new Event('change', { bubbles: true }));
         });
         
@@ -2858,7 +2805,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
 
   var addForm = $('add-form');
   
-  // Инициализация красивого календаря Flatpickr
   if (document.getElementById('discount-ends-input')) {
     flatpickr("#discount-ends-input", {
       enableTime: true,
@@ -2944,7 +2890,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
     $('input-hit').checked = false;
     $('input-draft').checked = false;
     
-    // Сброс кастомных селектов
     addForm.querySelectorAll('.custom-select-wrapper').forEach(wrapper => {
       const select = wrapper.previousElementSibling;
       if (select && select.tagName === 'SELECT') {
@@ -2970,14 +2915,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
       var f = addForm.elements;
       f.brand.value = p.brand; f.model.value = p.model;
       
-      // Обновление кастомных селектов при редактировании
       f.storage.value = p.storage; 
       f.color.value = p.color;
       f.condition.value = p.condition;
       f.kit.value = p.kit || '';
       f.sim.value = p.sim || ''; 
       
-      // Синхронизация визуальной части селектов
       addForm.querySelectorAll('.custom-select-wrapper').forEach(wrapper => {
         const select = wrapper.previousElementSibling;
         if (select && select.tagName === 'SELECT') {
@@ -3040,11 +2983,10 @@ const adminHTML = String.raw`<!DOCTYPE html>
       await loadPhones();
     } catch (err) {
       alert('Ошибка при смене статуса: ' + err.message);
-      loadPhones(); // Откатываем визуально назад, если не удалось
+      loadPhones();
     }
   });
 
-  // Обработка отзывов
   $('review-list').addEventListener('click', async function(e) {
     var appBtn = e.target.closest('[data-rev-approve]');
     var rejBtn = e.target.closest('[data-rev-reject]');
