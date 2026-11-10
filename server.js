@@ -9,7 +9,16 @@ const PORT = process.env.PORT || 3000;
 const DB_FILE = '/data/shop.json';
 
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(__dirname));
+
+// ---------- БЕЗОПАСНОСТЬ ----------
+// Блокируем доступ к системным файлам и базе данных через браузер
+app.use((req, res, next) => {
+  if (req.path.endsWith('.js') || req.path.endsWith('.json') || req.path.startsWith('/data/') || req.path === '/.env') {
+    return res.status(403).send('Доступ запрещен');
+  }
+  next();
+});
+app.use(express.static(__dirname, { dotfiles: 'deny' }));
 
 // ---------- Storage (JSON) ----------
 function readDB() {
@@ -17,6 +26,7 @@ function readDB() {
     const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     if (!Array.isArray(data.phones)) data.phones = [];
     if (!Array.isArray(data.reviews)) data.reviews = [];
+    if (!Array.isArray(data.tokens)) data.tokens = []; // Для токенов отзывов
     if (!data.nextId) data.nextId = data.phones.reduce((m, p) => Math.max(m, p.id || 0), 0) + 1;
     if (!data.nextReviewId) data.nextReviewId = data.reviews.reduce((m, r) => Math.max(m, r.id || 0), 0) + 1;
 
@@ -32,10 +42,15 @@ function readDB() {
 
     return data;
   } catch {
-    return { phones: [], reviews: [], nextId: 1, nextReviewId: 1 };
+    return { phones: [], reviews: [], tokens: [], nextId: 1, nextReviewId: 1 };
   }
 }
 function writeDB(data) {
+  // Создаем папку, если ее нет
+  const dir = path.dirname(DB_FILE);
+  if (!fs.existsSync(dir)){
+      fs.mkdirSync(dir, { recursive: true });
+  }
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
@@ -356,11 +371,24 @@ app.get('/api/reviews', (req, res) => {
   res.json(approved);
 });
 
+// ОТЗЫВЫ С ТОКЕНАМИ (Только для реальных покупателей)
 app.post('/api/review', async (req, res) => {
-  const { name, text, rating, phone_model } = req.body || {};
+  const { name, text, rating, phone_model, token } = req.body || {};
+  
   if (!name || !text) return res.status(400).json({ ok: false, error: 'Заполните имя и текст' });
+  if (!token) return res.status(403).json({ ok: false, error: 'Оставить отзыв могут только покупатели. Ссылка на отзыв приходит после покупки.' });
 
   const db = readDB();
+  
+  // Ищем токен и проверяем, не использован ли он
+  const tokenIndex = db.tokens.findIndex(t => t.token === token && t.used === false);
+  if (tokenIndex === -1) {
+    return res.status(403).json({ ok: false, error: 'Недействительная или уже использованная ссылка на отзыв.' });
+  }
+
+  // Помечаем токен использованным
+  db.tokens[tokenIndex].used = true;
+
   const review = {
     id: db.nextReviewId++,
     name: String(name).slice(0, 50),
@@ -374,7 +402,7 @@ app.post('/api/review', async (req, res) => {
   writeDB(db);
 
   await notify(
-    `🌟 <b>Новый отзыв!</b>\n\n` +
+    `🌟 <b>Новый отзыв (подтвержден)!</b>\n\n` +
     `👤 <b>Имя:</b> ${esc(name)}\n` +
     `📱 <b>Товар:</b> ${esc(phone_model) || 'Не указан'}\n` +
     `⭐ <b>Оценка:</b> ${review.rating}/5\n` +
@@ -396,6 +424,7 @@ app.post('/api/phone/:id/view', (req, res) => {
   res.json({ ok: true });
 });
 
+// ЗАЯВКА С ГЕНЕРАЦИЕЙ ТОКЕНА ДЛЯ ОТЗЫВА
 app.post('/api/order', async (req, res) => {
   const { phone_id, name, contact, message, type } = req.body || {};
   if (!name || !contact) return res.status(400).json({ ok: false, error: 'Заполните имя и контакт' });
@@ -410,8 +439,12 @@ app.post('/api/order', async (req, res) => {
 
   if (phone && type !== 'notify') {
     phone.orders = (phone.orders || 0) + 1;
-    writeDB(db);
   }
+
+  // Генерируем секретный токен для отзыва
+  const reviewToken = crypto.randomBytes(16).toString('hex');
+  db.tokens.push({ token: reviewToken, used: false, created_at: Date.now() });
+  writeDB(db); // Сохраняем токен в базу
 
   const phoneLine = phone
     ? `<b>${esc(phone.brand)} ${esc(phone.model)}</b>\n💰 Цена: ${Number(phone.price).toLocaleString('ru-RU')} ₽`
@@ -425,13 +458,17 @@ app.post('/api/order', async (req, res) => {
     extraLine = '\n<i>(Клиент ждет поступления этого товара)</i>';
   }
 
+  const siteUrl = 'https://iphone-shop.up.railway.app'; 
+  const reviewLink = `${siteUrl}/?review=${reviewToken}`;
+
   const err = await notify(
     `${title}\n\n` +
     `📱 ${phoneLine}${extraLine}\n\n` +
     `👤 <b>Имя:</b> ${esc(name)}\n` +
     `📞 <b>Контакт:</b> ${esc(finalContact)}\n` +
     `📝 <b>Комментарий:</b> ${esc(message) || '—'}\n\n` +
-    `🕒 ${new Date().toLocaleString('ru-RU')}`
+    `🕒 ${new Date().toLocaleString('ru-RU')}\n\n` +
+    `🔗 <b>Ссылка для отзыва (отправь клиенту после продажи):</b>\n${reviewLink}`
   );
 
   if (err) return res.status(500).json({ ok: false, error: err });
@@ -678,7 +715,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .trust-badges { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px 0; }
   .trust-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); background: #f5f5f7; padding: 4px 8px; border-radius: 6px; font-weight: 500; }
   .trust-badge svg { width: 14px; height: 14px; color: #1a7f37; }
-  .card-footer { display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto; padding-top: 12px; }
+  
+  /* ИСПРАВЛЕННЫЙ CSS ДЛЯ КНОПКИ */
+  .card-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-top: auto; padding-top: 12px; }
   
   .price-wrap { display: flex; flex-direction: column; gap: 2px; }
   .price-row { display: flex; align-items: center; gap: 6px; }
@@ -688,7 +727,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .price.discounted { color: var(--red); }
   .timer-label { font-size: 11px; color: var(--red); font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
   
-  .btn { border: none; border-radius: 14px; padding: 12px 24px; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--text); color: #fff; transition: all .2s; font-family: inherit; white-space: nowrap; }
+  /* ИСПРАВЛЕННЫЙ CSS ДЛЯ КНОПКИ (flex-shrink) */
+  .btn { border: none; border-radius: 14px; padding: 12px 24px; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--text); color: #fff; transition: all .2s; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
   .btn:hover:not(:disabled) { background: #000; transform: scale(1.02); }
   .btn:disabled { background: #e5e5ea; color: #86868b; cursor: not-allowed; transform: none; }
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 18px; }
@@ -932,7 +972,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     <div class="container">
       <div class="reviews-header">
         <div class="reviews-title">Отзывы наших клиентов</div>
-        <button class="btn btn-secondary" onclick="openReview()">Оставить отзыв</button>
+        <!-- Кнопка удалена, отзывы только по ссылке -->
       </div>
       <div class="reviews-grid" id="reviews-grid"></div>
     </div>
@@ -957,7 +997,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <li><a onclick="showInfo('meeting')">Встреча и оплата</a></li>
           <li><a onclick="showInfo('check')">Проверка при встрече</a></li>
           <li><a onclick="showInfo('faq')">Частые вопросы</a></li>
-          <li><a onclick="openReview()">Оставить отзыв</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -1316,10 +1355,20 @@ const indexHTML = String.raw`<!DOCTYPE html>
       renderFavorites();
       renderRecent();
       
+      // Обработка ссылок из URL
       const urlParams = new URLSearchParams(window.location.search);
       const phoneId = urlParams.get('id');
+      const reviewToken = urlParams.get('review');
+      
       if (phoneId) {
         setTimeout(function() { openDetail(Number(phoneId)); }, 100);
+      }
+      
+      // Если перешли по ссылке для отзыва
+      if (reviewToken) {
+        setTimeout(function() { 
+          window.openReview(reviewToken); 
+        }, 100);
       }
     }).catch(function() {
       grid.innerHTML = '<div class="empty">Ошибка загрузки данных</div>';
@@ -1756,11 +1805,22 @@ const indexHTML = String.raw`<!DOCTYPE html>
     selectedPhone = null;
   };
 
-  window.openReview = function() {
+  window.openReview = function(token) {
     reviewMsg.className = 'modal-msg';
     reviewForm.reset();
     if (ratingInput) ratingInput.value = 5;
     if (stars.length > 0) setStars(5);
+    
+    // Сохраняем токен в скрытое поле формы
+    let tokenInput = reviewForm.querySelector('input[name="token"]');
+    if (!tokenInput) {
+        tokenInput = document.createElement('input');
+        tokenInput.type = 'hidden';
+        tokenInput.name = 'token';
+        reviewForm.appendChild(tokenInput);
+    }
+    tokenInput.value = token || '';
+    
     reviewModal.classList.add('open');
   };
 
@@ -1779,7 +1839,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
       }, 1500);
     } else {
       document.getElementById('info-title').textContent = 'Отзывы';
-      document.getElementById('info-text').innerHTML = '<p class="info-text-block">У нас пока нет опубликованных отзывов.<br><br>Но если вы уже совершили у нас покупку, мы будем очень рады, если вы поделитесь своим впечатлением!</p><button class="btn btn-secondary" style="margin-top:20px; width: 100%;" onclick="closeInfo(); openReview();">Написать отзыв</button>';
+      document.getElementById('info-text').innerHTML = '<p class="info-text-block">У нас пока нет опубликованных отзывов.<br><br>Мы очень дорожим своей репутацией. Отзывы могут оставлять только реальные покупатели. После совершения покупки мы пришлем вам персональную ссылку для отзыва в Telegram.</p>';
       infoModal.classList.add('open');
     }
   };
