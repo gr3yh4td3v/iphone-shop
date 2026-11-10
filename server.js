@@ -2325,8 +2325,8 @@ const adminHTML = String.raw`<!DOCTYPE html>
   };
 
   async function loadPhones() {
-    // ИСПОЛЬЗУЕМ НОВЫЙ РОУТ ДЛЯ АДМИНКИ
-    var r = await api('/api/admin/phones');
+    // ИСПОЛЬЗУЕМ НОВЫЙ РОУТ ДЛЯ АДМИНКИ И СБРАСЫВАЕМ КЭШ
+    var r = await api('/api/admin/phones?_t=' + Date.now());
     phones = await r.json();
     renderList();
     updateStats();
@@ -2486,7 +2486,8 @@ const adminHTML = String.raw`<!DOCTYPE html>
           trigger.classList.remove('open');
           optionsContainer.classList.remove('open');
           
-          select.dispatchEvent(new Event('change')); // Вызываем стандартное событие
+          // ВАЖНО: Добавляем bubbles: true, чтобы событие "всплыло" до обработчика
+          select.dispatchEvent(new Event('change', { bubbles: true }));
         });
         
         optionsContainer.appendChild(optDiv);
@@ -2677,10 +2678,17 @@ const adminHTML = String.raw`<!DOCTYPE html>
     if (!sel) return;
     var id = Number(sel.dataset.statusId);
     var status = sel.value;
-    // Применяем цвет к нативному селекту (на случай если кастомный не сработал)
     sel.className = 'status-select ' + status;
-    await api('/api/admin/phones/' + id, { method: 'PUT', body: JSON.stringify({ status: status }) });
-    await loadPhones();
+    
+    try {
+      var res = await api('/api/admin/phones/' + id, { method: 'PUT', body: JSON.stringify({ status: status }) });
+      var data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Ошибка обновления');
+      await loadPhones();
+    } catch (err) {
+      alert('Ошибка при смене статуса: ' + err.message);
+      loadPhones(); // Откатываем визуально назад, если не удалось
+    }
   });
 
   // Обработка отзывов
