@@ -1846,9 +1846,14 @@ const adminHTML = String.raw`<!DOCTYPE html>
     --border:#d2d2d7; --accent:#0071e3; --green:#34c759; --amber:#ff9500; --red:#ff3b30; }
   * { box-sizing:border-box; margin:0; padding:0; }
   
+  /* Жестко убиваем стрелочки у ВСЕХ числовых полей в браузере */
   input[type=number]::-webkit-inner-spin-button, 
-  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none !important; 
+    margin: 0 !important; 
+    display: none !important;
+  }
+  input[type=number] { -moz-appearance: textfield !important; }
 
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -2109,22 +2114,68 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .custom-select-trigger.status-trigger.sold      { color:#b0251f; border-color:#fecdd3; background-color:#fef2f2; }
   .custom-select-trigger.status-trigger.draft     { color:#555; border-color:#ccc; background-color:#f5f5f5; }
 
-  /* Стили для календаря Flatpickr */
-  .flatpickr-calendar { z-index: 9999 !important; font-family: 'Inter', sans-serif; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); border: 1px solid var(--border); }
+  /* БЕЗЖАЛОСТНЫЙ ФИКС ДЛЯ FLATPICKR */
+  .flatpickr-calendar { 
+    z-index: 9999 !important; 
+    font-family: 'Inter', sans-serif !important; 
+    border-radius: 16px !important; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important; 
+    border: 1px solid var(--border) !important; 
+    padding: 5px;
+  }
+  
+  /* Убираем черную обводку и центрируем месяц */
+  .flatpickr-current-month {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    padding-top: 0 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+  .flatpickr-current-month .flatpickr-monthDropdown-months {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    padding: 0 !important;
+  }
+
+  /* Убираем стрелки в блоке времени Flatpickr */
+  .flatpickr-time input { 
+    -moz-appearance: textfield !important; 
+    font-size: 16px !important; 
+    font-weight: 600 !important; 
+    height: 40px !important; 
+    text-align: center !important;
+    pointer-events: auto;
+  }
+  .flatpickr-time input::-webkit-outer-spin-button,
+  .flatpickr-time input::-webkit-inner-spin-button { 
+    -webkit-appearance: none !important; 
+    margin: 0 !important; 
+    display: none !important;
+  }
+  .flatpickr-time .flatpickr-time-separator { 
+    font-size: 18px !important; 
+    font-weight: 600 !important; 
+    color: var(--text) !important; 
+  }
+  
+  /* Красивые кнопки выбора времени */
+  .flatpickr-time .numInputWrapper { height: 40px; }
+  .flatpickr-time .numInputWrapper span.arrowUp,
+  .flatpickr-time .numInputWrapper span.arrowDown { border: none; }
+
   .flatpickr-day.selected { background: var(--accent) !important; border-color: var(--accent) !important; }
   .flatpickr-day:hover { background: #f5f5f7; }
-  .flatpickr-time input:hover, .flatpickr-time .flatpickr-am-pm:hover { background: #f5f5f7; }
-  .flatpickr-calendar.hasTime .flatpickr-time { border-top: 1px solid var(--border); }
-  .flatpickr-months .flatpickr-month { color: var(--text); }
-  .flatpickr-current-month .flatpickr-monthDropdown-months { font-weight: 600; }
+  .flatpickr-months { background: transparent; border-radius: 12px 12px 0 0; }
+  .flatpickr-months .flatpickr-month { color: var(--text); height: 40px; }
   .flatpickr-weekdays { background: transparent; }
-  span.flatpickr-weekday { color: var(--muted); font-weight: 500; }
-  
-  /* Убираем стрелочки у часов и минут */
-  .flatpickr-time input { -moz-appearance: textfield; font-size: 16px; font-weight: 600; height: 40px; text-align: center; }
-  .flatpickr-time input::-webkit-outer-spin-button,
-  .flatpickr-time input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .flatpickr-time .flatpickr-time-separator { font-size: 18px; font-weight: 600; color: var(--text); }
+  span.flatpickr-weekday { color: var(--muted); font-weight: 500; font-size: 13px; }
 
   @media (max-width:720px) {
     .dashboard { flex-direction: column; }
@@ -2729,8 +2780,9 @@ const adminHTML = String.raw`<!DOCTYPE html>
       altInput: true,
       altFormat: "d.m.Y H:i",
       locale: "ru",
-      disableMobile: "true"
-      // Убрали monthSelectorType: "dropdown", чтобы вернуть стандартные красивые стрелочки переключения месяцев
+      disableMobile: "true",
+      monthSelectorType: "static",
+      static: true
     });
   }
 
