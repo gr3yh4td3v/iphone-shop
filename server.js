@@ -759,10 +759,11 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  /* ИСПРАВЛЕННЫЙ БЛОК С КНОПКАМИ */
-  .detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; }
-  .detail-actions .btn { width: 100%; justify-content: center; padding: 12px 10px; font-size: 14px; }
-  .detail-actions .btn:last-child { grid-column: 1 / -1; }
+  /* ИСПРАВЛЕННЫЕ КНОПКИ (только В избранное и Забронировать) */
+  .detail-actions { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 380px; }
+  .detail-actions .btn { justify-content: center; padding: 12px 10px; font-size: 14px; }
+  .detail-actions .btn-outline { flex: 1; }
+  .detail-actions .btn:last-child { flex: 2; }
   
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 6px; }
   .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
@@ -985,8 +986,19 @@ const indexHTML = String.raw`<!DOCTYPE html>
     </div>
     <div class="detail-content">
       <div class="detail-title" id="detail-title"></div>
-      <div class="detail-meta" id="detail-meta"></div>
       
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 32px;">
+        <div class="detail-meta" id="detail-meta" style="margin-bottom: 0;"></div>
+        <button class="btn btn-outline" id="detail-share-btn" style="padding: 8px 16px; font-size: 13px; border-radius: 12px; flex-shrink: 0; width: auto;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+            <polyline points="16 6 12 2 8 6"></polyline>
+            <line x1="12" y1="2" x2="12" y2="15"></line>
+          </svg>
+          <span>Поделиться</span>
+        </button>
+      </div>
+
       <div class="specs-grid" id="detail-specs"></div>
       
       <div class="detail-desc" id="detail-desc"></div>
@@ -1019,14 +1031,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <div class="detail-price" id="detail-price"></div>
         </div>
         <div class="detail-actions">
-          <button class="btn btn-outline" id="detail-share-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-              <polyline points="16 6 12 2 8 6"></polyline>
-              <line x1="12" y1="2" x2="12" y2="15"></line>
-            </svg>
-            <span>Поделиться</span>
-          </button>
           <button class="btn btn-outline" id="detail-fav-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
             <span>В избранное</span>
