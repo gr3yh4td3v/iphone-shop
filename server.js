@@ -70,19 +70,70 @@ function dataURItoBlob(dataURI) {
   return new Blob([ab], { type: mimeString });
 }
 
+// ---------- Форматирование постов ----------
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;');
+
+function formatPrice(phone) {
+  const price = Number(phone.price) || 0;
+  const oldPrice = Number(phone.old_price) || 0;
+
+  let priceText = `<b>${price.toLocaleString('ru-RU')} ₽</b>`;
+
+  if (oldPrice > price && price > 0) {
+    const discount = Math.round((1 - price / oldPrice) * 100);
+    priceText =
+      `<s>${oldPrice.toLocaleString('ru-RU')} ₽</s> ` +
+      `<b>${price.toLocaleString('ru-RU')} ₽</b> (-${discount}%)`;
+  }
+
+  return priceText;
+}
+
+function buildProductCaption(phone, siteUrl) {
+  const lines = [
+    `🔥 <b>Новое поступление!</b>`,
+    ``,
+    `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>`,
+  ];
+
+  let specLine = `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}`;
+  if (phone.sim) specLine += ` | 📶 ${esc(phone.sim)}`;
+  lines.push(specLine);
+
+  if (phone.condition) lines.push(`🏷️ Состояние: ${esc(phone.condition)}`);
+  if (phone.kit)       lines.push(`🎁 Комплект: ${esc(phone.kit)}`);
+
+  lines.push(
+    `🔋 АКБ: ${esc(phone.battery) || '—'}%`,
+    `💰 Цена: ${formatPrice(phone)}`,
+    ``,
+    `👉 <a href="${siteUrl}">Смотреть на сайте</a>`
+  );
+
+  return lines.join('\n');
+}
+
 async function notifyProductAdded(phone) {
   if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) return;
   const apiBase = getTelegramApiBase();
   const siteUrl = `https://iphone-shop.up.railway.app/?id=${phone.id}`;
-  
-  const text = `➕ <b>Добавлен товар</b>\n\n` +
-               `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
-               `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}\n` +
-               `🔋 АКБ: ${esc(phone.battery) || '—'}%\n` +
-               `🏷️ Состояние: ${esc(phone.condition) || '—'}\n` +
-               `💰 Цена: <b>${Number(phone.price).toLocaleString('ru-RU')} ₽</b>\n` +
-               (phone.imei ? `🔑 IMEI: ${esc(phone.imei)}\n` : '') +
-               `\n👉 <a href="${siteUrl}">Посмотреть на сайте</a>`;
+
+  let text = `➕ <b>Добавлен товар</b>\n\n` +
+             `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
+             `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}`;
+  if (phone.sim) text += ` | 📶 ${esc(phone.sim)}`;
+  text += `\n`;
+
+  if (phone.condition) text += `🏷️ Состояние: ${esc(phone.condition)}\n`;
+  if (phone.kit)       text += `🎁 Комплект: ${esc(phone.kit)}\n`;
+
+  text += `🔋 АКБ: ${esc(phone.battery) || '—'}%\n`;
+  text += `💰 Цена: ${formatPrice(phone)}\n`;
+  if (phone.imei) text += `🔑 IMEI: ${esc(phone.imei)}\n`;
+  text += `\n👉 <a href="${siteUrl}">Посмотреть на сайте</a>`;
 
   try {
     const formData = new FormData();
@@ -120,12 +171,7 @@ async function postToChannel(phone) {
   if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return;
   const apiBase = getTelegramApiBase();
   const siteUrl = `https://iphone-shop.up.railway.app/?id=${phone.id}`;
-  const caption = `🔥 <b>Новое поступление!</b>\n\n` +
-                  `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
-                  `💾 ${esc(phone.storage) || '—'} | 🎨 ${esc(phone.color) || '—'}\n` +
-                  `🔋 АКБ: ${esc(phone.battery) || '—'}%\n` +
-                  `💰 Цена: <b>${Number(phone.price).toLocaleString('ru-RU')} ₽</b>\n\n` +
-                  `👉 <a href="${siteUrl}">Смотреть на сайте</a>`;
+  const caption = buildProductCaption(phone, siteUrl);
 
   try {
     const formData = new FormData();
@@ -160,7 +206,6 @@ async function postToChannel(phone) {
   }
 }
 
-const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const STATUSES = ['available', 'reserved', 'sold', 'draft'];
 
 // ---------- Auth ----------
@@ -300,7 +345,7 @@ app.post('/api/admin/login', (req, res) => {
 
 app.get('/api/admin/auth/telegram', (req, res) => {
   const { hash, ...data } = req.query;
-  
+
   if (!hash) return res.status(400).send('Отсутствует подпись Telegram');
 
   const checkString = Object.keys(data).sort().map(key => `${key}=${data[key]}`).join('\n');
@@ -321,7 +366,7 @@ app.get('/api/admin/export', auth, (req, res) => {
     const clean = (s) => '"' + String(s || '').replace(/"/g, '""') + '"';
     csv += `${p.id};${clean(p.brand)};${clean(p.model)};${p.price};${p.views||0};${p.orders||0};${p.favorites||0};${p.status};${clean(new Date(p.created_at).toLocaleString('ru-RU'))}\n`;
   });
-  
+
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="iphone-shop-db.csv"');
   res.send('\uFEFF' + csv);
@@ -1387,7 +1432,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
       if (p.images.length > 1) {
         var thumbsHtml = '';
         for (var i = 0; i < p.images.length; i++) {
-          thumbsHtml += '<img src="' + p.images[i] + '" class="detail-thumb ' + (i===0?'active':'') + '" onclick="changeMainImg(this, \'' + p.images[i] + '\')">';
+          thumbsHtml += '<img src="' + p.images[i] + '" class="detail-thumb ' + (i===0?'active':'') + '" onclick="changeMainImg(this, '' + p.images[i] + '')">';
         }
         thumbsBox.innerHTML = thumbsHtml;
         thumbsBox.style.display = 'flex';
@@ -1429,7 +1474,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     if (p.sim) specsHtml += '<div class="spec-item"><span class="spec-label">SIM</span><span class="spec-value">' + esc(p.sim) + '</span></div>';
     
     if (p.imei) {
-      var imeiStr = String(p.imei).replace(/\D/g, '');
+      var imeiStr = String(p.imei).replace(/D/g, '');
       var last5 = imeiStr.slice(-5);
       if (last5.length > 0) {
         specsHtml += '<div class="spec-item"><span class="spec-label">IMEI</span><span class="spec-value">... ' + last5 + '</span></div>';
