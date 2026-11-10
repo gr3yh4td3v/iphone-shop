@@ -803,9 +803,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
+  /* ИСПРАВЛЕННЫЙ CSS ДЛЯ НИЖНЕГО БЛОКА В МОДАЛКЕ */
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
   @media(min-width: 768px) { 
-    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: flex-start; gap: 24px; } 
+    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } 
   }
   
   .detail-price-wrap { display: flex; flex-direction: column; }
@@ -815,7 +816,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   
   .detail-actions { display: flex; width: 100%; }
   @media(min-width: 768px) { 
-    .detail-actions { width: auto; min-width: 0; } 
+    .detail-actions { width: auto; min-width: 0; margin-left: auto; } 
     .detail-actions .btn { padding: 16px 32px; font-size: 16px; }
   }
 
@@ -972,7 +973,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     <div class="container">
       <div class="reviews-header">
         <div class="reviews-title">Отзывы наших клиентов</div>
-        <!-- Кнопка удалена, отзывы только по ссылке -->
       </div>
       <div class="reviews-grid" id="reviews-grid"></div>
     </div>
@@ -1838,8 +1838,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
         section.style.backgroundColor = '';
       }, 1500);
     } else {
+      // УЛУЧШЕННЫЙ ТЕКСТ ОТЗЫВОВ
       document.getElementById('info-title').textContent = 'Отзывы';
-      document.getElementById('info-text').innerHTML = '<p class="info-text-block">У нас пока нет опубликованных отзывов.<br><br>Мы очень дорожим своей репутацией. Отзывы могут оставлять только реальные покупатели. После совершения покупки мы пришлем вам персональную ссылку для отзыва в Telegram.</p>';
+      document.getElementById('info-text').innerHTML = '<p class="info-text-block">Пока у нас нет опубликованных отзывов, но мы очень дорожим своей репутацией.<br><br>Мы верим в честность и прозрачность, поэтому оставлять отзывы могут только реальные покупатели. После совершения покупки мы обязательно отправим Вам персональную ссылку в Telegram, чтобы Вы могли поделиться своими впечатлениями. Ваше доверие — наша главная ценность!</p>';
       infoModal.classList.add('open');
     }
   };
@@ -1855,7 +1856,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     },
     about: { title: 'О нас', html: '<p class="info-text-block">Мы верим, что хорошая техника не должна стоить безумных денег. Наш магазин — это тщательно отобранные устройства. Мы гарантируем безупречное техническое состояние: лично проверяем историю каждого аппарата, аккумулятор и подлинность деталей. Все внешние нюансы (если они есть) мы всегда честно описываем. Вы получаете статусный гаджет по честной цене и без рисков покупки с рук.</p>' },
     contacts: { title: 'Контакты', html: '<p class="info-text-block">Связаться с нами напрямую можно в Telegram: <b>@ShopysiPhones</b>.<br>Наши новости и отзывы в канале: <b>@ShopysiPhonesStore</b>.<br>Мы онлайн ежедневно с 10:00 до 22:00.</p>' },
-    privacy: { title: 'Политика конфиденциальности', html: '<p class="info-text-block">Ваша конфиденциальность очень важна для нас. <br><br>Мы собираем только те данные (имя и контакт), которые вы добровольно оставляете в формах заявок на нашем сайте. Эти данные используются исключительно для связи с вами по поводу покупки интересующего вас устройства.<br><br>Мы никогда не передаем ваши персональные данные третьим лицам и не используем их для спам-рассылок. Нажимая кнопку «Отправить» в форме заявки, вы даете согласие на обработку ваших персональных данных в указанных целях.</p>' },
+    privacy: { title: 'Политика конфиденциальности', html: '<p class="info-text-block">Ваша конфиденциальность очень важна для нас. <br><br>Мы собираем только те данные (имя и контакт), которые Вы добровольно оставляете в формах заявок на нашем сайте. Эти данные используются исключительно для связи с Вами по поводу покупки интересующего Вас устройства.<br><br>Мы никогда не передаем Ваши персональные данные третьим лицам и не используем их для спам-рассылок. Нажимая кнопку «Отправить» в форме заявки, Вы даете согласие на обработку Ваших персональных данных в указанных целях.</p>' },
   };
 
   window.showInfo = function(key) {
