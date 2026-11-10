@@ -434,6 +434,12 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .status.sold      { background: rgba(255, 255, 255, 0.95); color: #b0251f; border: 1px solid rgba(176, 37, 31, 0.2); }
   .hit-badge { position: absolute; top: 16px; left: 16px; background: var(--text); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-transform: uppercase; letter-spacing: 0.5px; }
   
+  /* Кнопка Избранное на картинке */
+  .fav-btn { position: absolute; bottom: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: all 0.2s; }
+  .fav-btn:hover { transform: scale(1.1); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+  .fav-btn svg { width: 20px; height: 20px; transition: all 0.2s; }
+  .fav-btn.active svg { color: var(--red); }
+
   .card-body { padding: 28px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
   .card-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
   .card-meta { color: #515154; font-size: 15px; font-weight: 500; }
@@ -468,21 +474,24 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .review-text { font-size: 14px; color: #444; line-height: 1.5; font-style: italic; }
   .review-date { font-size: 12px; color: var(--muted); margin-top: auto; }
 
-  .recent-section { padding-bottom: 80px; display: none; }
-  .recent-header { margin-bottom: 24px; }
-  .recent-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
-  .recent-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scroll-snap-type: x mandatory; scroll-behavior: smooth; }
-  .recent-grid::-webkit-scrollbar { height: 6px; }
-  .recent-card { min-width: 240px; max-width: 240px; scroll-snap-align: start; }
-  .recent-card .card-img { aspect-ratio: 1; }
-  .recent-card .card-body { padding: 16px; }
-  .recent-card .card-title { font-size: 16px; }
-  .recent-card .price { font-size: 20px; }
-  .recent-card .btn { padding: 8px 12px; font-size: 13px; }
-  .recent-card .status { top: 10px; right: 10px; font-size: 11px; padding: 6px 10px; }
-  .recent-card .hit-badge { top: 10px; left: 10px; font-size: 11px; padding: 4px 8px; }
-  .recent-card .trust-badges { display: none; }
-  .recent-card .timer-label { display: none; }
+  /* Секции недавно просмотренных и избранного */
+  .recent-section, .favorites-section { padding-bottom: 80px; display: none; }
+  .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+  .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
+  .recent-grid, .favorites-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scroll-snap-type: x mandatory; scroll-behavior: smooth; }
+  .recent-grid::-webkit-scrollbar, .favorites-grid::-webkit-scrollbar { height: 6px; }
+  .recent-card, .favorite-card { min-width: 240px; max-width: 240px; scroll-snap-align: start; }
+  .recent-card .card-img, .favorite-card .card-img { aspect-ratio: 1; }
+  .recent-card .card-body, .favorite-card .card-body { padding: 16px; }
+  .recent-card .card-title, .favorite-card .card-title { font-size: 16px; }
+  .recent-card .price, .favorite-card .price { font-size: 20px; }
+  .recent-card .btn, .favorite-card .btn { padding: 8px 12px; font-size: 13px; }
+  .recent-card .status, .favorite-card .status { top: 10px; right: 10px; font-size: 11px; padding: 6px 10px; }
+  .recent-card .hit-badge, .favorite-card .hit-badge { top: 10px; left: 10px; font-size: 11px; padding: 4px 8px; }
+  .recent-card .trust-badges, .favorite-card .trust-badges { display: none; }
+  .recent-card .timer-label, .favorite-card .timer-label { display: none; }
+  .recent-card .fav-btn, .favorite-card .fav-btn { width: 32px; height: 32px; bottom: 10px; right: 10px; }
+  .recent-card .fav-btn svg, .favorite-card .fav-btn svg { width: 16px; height: 16px; }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 100; opacity: 0; transition: opacity .3s ease; }
   .modal-overlay.open { display: flex; opacity: 1; }
@@ -579,10 +588,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .detail-img-container { min-height: 300px; }
     .footer-grid { grid-template-columns: 1fr; gap: 32px; }
     .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
-    .recent-card { min-width: 180px; max-width: 180px; }
-    .recent-card .card-title { font-size: 14px; }
-    .recent-card .price { font-size: 16px; }
-    .recent-card .btn { display: none; }
+    .recent-card, .favorite-card { min-width: 180px; max-width: 180px; }
+    .recent-card .card-title, .favorite-card .card-title { font-size: 14px; }
+    .recent-card .price, .favorite-card .price { font-size: 16px; }
+    .recent-card .btn, .favorite-card .btn { display: none; }
     .logo img { height: 32px; }
     .logo span { font-size: 18px; }
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
@@ -647,6 +656,15 @@ const indexHTML = String.raw`<!DOCTYPE html>
     
     <div class="grid" id="grid"></div>
 
+    <!-- НОВАЯ СЕКЦИЯ: ИЗБРАННОЕ -->
+    <div class="favorites-section" id="favorites-section">
+      <div class="favorites-header">
+        <div class="favorites-title">Избранное</div>
+      </div>
+      <div class="favorites-grid" id="favorites-grid"></div>
+    </div>
+
+    <!-- Секция: Вы недавно смотрели -->
     <div class="recent-section" id="recent-section">
       <div class="recent-header">
         <div class="recent-title">Вы недавно смотрели</div>
@@ -888,6 +906,27 @@ const indexHTML = String.raw`<!DOCTYPE html>
   var stars = document.querySelectorAll('#star-rating .star');
   var ratingInput = document.getElementById('rating-input');
 
+  // --- ИЗБРАННОЕ ---
+  function getFavorites() {
+    try { return JSON.parse(localStorage.getItem('favorites') || '[]'); } catch(e) { return []; }
+  }
+  function saveFavorites(favs) {
+    localStorage.setItem('favorites', JSON.stringify(favs));
+  }
+  function toggleFavorite(id, event) {
+    if (event) event.stopPropagation(); // Не открываем карточку
+    var favs = getFavorites();
+    if (favs.includes(id)) {
+      favs = favs.filter(function(x) { return x !== id; });
+    } else {
+      favs.push(id);
+    }
+    saveFavorites(favs);
+    render();
+    renderFavorites();
+    renderRecent(); // Обновляем, чтобы сердечки везде перерисовались
+  }
+
   function setStars(val) {
     stars.forEach(function(s, i) {
       if (i < val) s.classList.add('active');
@@ -958,20 +997,27 @@ const indexHTML = String.raw`<!DOCTYPE html>
     timersInterval = setInterval(updateTimers, 1000);
   }
 
-  document.getElementById('recent-grid').addEventListener('wheel', function(e) {
-    var isAtEnd = this.scrollWidth - this.scrollLeft <= this.clientWidth;
-    var isAtStart = this.scrollLeft === 0;
-
-    if ((e.deltaY > 0 && !isAtEnd) || (e.deltaY < 0 && !isAtStart)) {
-      e.preventDefault();
-      this.scrollLeft += e.deltaY;
+  function enableWheelScroll(containerId) {
+    var el = document.getElementById(containerId);
+    if (el) {
+      el.addEventListener('wheel', function(e) {
+        var isAtEnd = this.scrollWidth - this.scrollLeft <= this.clientWidth;
+        var isAtStart = this.scrollLeft === 0;
+        if ((e.deltaY > 0 && !isAtEnd) || (e.deltaY < 0 && !isAtStart)) {
+          e.preventDefault();
+          this.scrollLeft += e.deltaY;
+        }
+      }, { passive: false });
     }
-  }, { passive: false });
+  }
+  enableWheelScroll('recent-grid');
+  enableWheelScroll('favorites-grid');
 
   function load() {
     fetch('/api/phones').then(function(r) { return r.json(); }).then(function(data) {
       allPhones = data; 
       render(); 
+      renderFavorites();
       renderRecent();
       
       const urlParams = new URLSearchParams(window.location.search);
@@ -1016,14 +1062,18 @@ const indexHTML = String.raw`<!DOCTYPE html>
     }
   }
 
-  function buildCardHtml(p, isRecent) {
+  function buildCardHtml(p, cardType) {
     var mainImg = p.images && p.images.length > 0 ? p.images[0] : '';
     var img = mainImg ? '<img src="' + mainImg + '" alt="" loading="lazy">' : phoneSvg;
-    
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
     var btn = '';
     
-    if (!isRecent) {
+    // Проверяем, в избранном ли товар
+    var isFav = getFavorites().includes(p.id);
+    var heartSvg = '<svg viewBox="0 0 24 24" fill="' + (isFav ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: ' + (isFav ? 'var(--red)' : 'var(--muted)') + ';"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
+    var favBtnHtml = '<div class="fav-btn" data-fav-id="' + p.id + '" title="В избранное">' + heartSvg + '</div>';
+
+    if (cardType !== 'mini') {
       if (p.status === 'sold') {
         btn = '<button class="btn" data-notify-btn="' + p.id + '">Уведомить</button>';
       } else {
@@ -1045,14 +1095,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
     if (isDiscounted) {
       var discountPercent = Math.round((1 - (p.price / p.old_price)) * 100);
+      priceHtml = '<div class="price-row"><span class="price-old">' + Number(p.old_price).toLocaleString('ru-RU') + ' ₽</span><span class="discount-percent-inline">-' + discountPercent + '%</span></div><div class="price discounted">' + Number(p.price).toLocaleString('ru-RU') + ' ₽</div>';
       
-      priceHtml = '<div class="price-row">' +
-        '<span class="price-old">' + Number(p.old_price).toLocaleString('ru-RU') + ' ₽</span>' +
-        '<span class="discount-percent-inline">-' + discountPercent + '%</span>' +
-      '</div>';
-      priceHtml += '<div class="price discounted">' + Number(p.price).toLocaleString('ru-RU') + ' ₽</div>';
-      
-      if (hasTimer && !isRecent) {
+      if (hasTimer && cardType === 'main') {
         var endMs = new Date(p.discount_ends).getTime();
         priceHtml += '<div class="timer-label" data-end="' + endMs + '">' + formatTime(endMs - now) + '</div>';
       }
@@ -1061,7 +1106,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     }
 
     var trustHtml = '';
-    if (!isRecent) {
+    if (cardType === 'main') {
       trustHtml = '<div class="trust-badges">' +
         '<span class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Проверен</span>' +
         '<span class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg> Оригинал</span>' +
@@ -1069,8 +1114,12 @@ const indexHTML = String.raw`<!DOCTYPE html>
       '</div>';
     }
 
-    return '<article class="card ' + p.status + (isRecent ? ' recent-card' : '') + '" data-card="' + p.id + '">' +
-      '<div class="card-img">' + img + hitHtml +
+    var cardClass = 'card ' + p.status;
+    if (cardType === 'recent') cardClass += ' recent-card';
+    if (cardType === 'favorite') cardClass += ' favorite-card';
+
+    return '<article class="' + cardClass + '" data-card="' + p.id + '">' +
+      '<div class="card-img">' + img + hitHtml + favBtnHtml +
         '<span class="status ' + p.status + '">' + STATUS_LABEL[p.status] + '</span>' +
       '</div>' +
       '<div class="card-body">' +
@@ -1125,7 +1174,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
     var html = '';
     for (var i = 0; i < list.length; i++) {
-      html += buildCardHtml(list[i], false);
+      html += buildCardHtml(list[i], 'main');
     }
     grid.innerHTML = html;
     startTimers();
@@ -1140,6 +1189,25 @@ const indexHTML = String.raw`<!DOCTYPE html>
     recent.unshift(id);
     if (recent.length > 5) recent.pop();
     localStorage.setItem('recently_viewed', JSON.stringify(recent));
+  }
+
+  function renderFavorites() {
+    var favs = getFavorites();
+    var favPhones = allPhones.filter(function(p) { return favs.includes(p.id); });
+
+    var section = document.getElementById('favorites-section');
+    var gridBox = document.getElementById('favorites-grid');
+
+    if (favPhones.length > 0) {
+      section.style.display = 'block';
+      var html = '';
+      for (var j = 0; j < favPhones.length; j++) {
+        html += buildCardHtml(favPhones[j], 'favorite');
+      }
+      gridBox.innerHTML = html;
+    } else {
+      section.style.display = 'none';
+    }
   }
 
   function renderRecent() {
@@ -1159,7 +1227,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
       section.style.display = 'block';
       var html = '';
       for (var j = 0; j < recentPhones.length; j++) {
-        html += buildCardHtml(recentPhones[j], true);
+        html += buildCardHtml(recentPhones[j], 'recent');
       }
       gridBox.innerHTML = html;
     } else {
@@ -1176,7 +1244,15 @@ const indexHTML = String.raw`<!DOCTYPE html>
     render();
   });
 
-  grid.addEventListener('click', function(e) {
+  // Делегирование кликов для всех сеток (главная, недавние, избранное)
+  function handleCardClick(e) {
+    var favBtn = e.target.closest('.fav-btn');
+    if (favBtn) {
+      var id = Number(favBtn.dataset.favId);
+      toggleFavorite(id, e);
+      return;
+    }
+
     var orderBtn = e.target.closest('[data-order-btn]');
     if (orderBtn) {
       e.stopPropagation();
@@ -1193,14 +1269,11 @@ const indexHTML = String.raw`<!DOCTYPE html>
     if (card) {
       openDetail(Number(card.dataset.card));
     }
-  });
+  }
 
-  document.getElementById('recent-grid').addEventListener('click', function(e) {
-    var card = e.target.closest('[data-card]');
-    if (card) {
-      openDetail(Number(card.dataset.card));
-    }
-  });
+  grid.addEventListener('click', handleCardClick);
+  document.getElementById('recent-grid').addEventListener('click', handleCardClick);
+  document.getElementById('favorites-grid').addEventListener('click', handleCardClick);
 
   function openDetail(id) {
     var p = allPhones.find(function(x) { return x.id === id; });
@@ -1513,14 +1586,14 @@ const adminHTML = String.raw`<!DOCTYPE html>
   
   .login-err { color:var(--red); font-size:13px; text-align:center; margin-top:12px; min-height:20px; }
   
-  /* Контейнер для кнопки Telegram */
+  /* Контейнер для кнопки Telegram с анимацией */
   .tg-widget-wrap { 
     display: flex; 
     justify-content: center; 
     margin-bottom: 20px; 
     border-radius: 12px; 
     overflow: hidden; 
-    background: #54a9eb; /* Синий цвет Telegram, чтобы скрыть черные углы */
+    background: #54a9eb; 
     width: fit-content;
     margin-left: auto;
     margin-right: auto;
@@ -1534,7 +1607,6 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .tg-widget-wrap iframe {
     display: block;
     border: none !important;
-    /* Убираем черные углы через жесткое обрезание */
     clip-path: inset(0 0 0 0 round 12px) !important;
     border-radius: 12px !important;
   }
