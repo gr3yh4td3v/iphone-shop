@@ -96,8 +96,9 @@ function formatPrice(phone) {
 
 function buildProductCaption(phone, siteUrl) {
   let header;
-  if (phone.status === 'sold')          header = `🔥 <b>Продано</b>`;
-  else if (phone.status === 'reserved') header = `🔥 <b>Забронировано</b>`;
+  // Меняем эмодзи в зависимости от статуса
+  if (phone.status === 'sold')          header = `❌ <b>Продано</b>`;
+  else if (phone.status === 'reserved') header = `⏳ <b>Забронировано</b>`;
   else                                  header = `🔥 <b>Новое поступление!</b>`;
 
   const lines = [
