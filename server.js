@@ -2124,7 +2124,31 @@ const adminHTML = String.raw`<!DOCTYPE html>
     padding: 5px;
   }
   
-  /* Убираем черную обводку и центрируем месяц */
+  /* Убираем все дефолтные стрелочки в flatpickr (года и времени) */
+  .flatpickr-current-month .numInputWrapper span,
+  .flatpickr-time .numInputWrapper span {
+    display: none !important;
+  }
+  
+  /* Убираем нативные браузерные стрелки в полях ввода flatpickr */
+  .flatpickr-current-month input.cur-year,
+  .flatpickr-time input {
+    -moz-appearance: textfield !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    height: 40px !important;
+    text-align: center !important;
+  }
+  .flatpickr-current-month input.cur-year::-webkit-outer-spin-button,
+  .flatpickr-current-month input.cur-year::-webkit-inner-spin-button,
+  .flatpickr-time input::-webkit-outer-spin-button,
+  .flatpickr-time input::-webkit-inner-spin-button { 
+    -webkit-appearance: none !important; 
+    margin: 0 !important; 
+    display: none !important;
+  }
+  
+  /* Центрируем месяц и год */
   .flatpickr-current-month {
     font-size: 15px !important;
     font-weight: 600 !important;
@@ -2132,6 +2156,8 @@ const adminHTML = String.raw`<!DOCTYPE html>
     display: flex !important;
     align-items: center;
     justify-content: center;
+    width: 100% !important;
+    left: 0 !important;
   }
   .flatpickr-current-month .flatpickr-monthDropdown-months {
     outline: none !important;
@@ -2142,36 +2168,48 @@ const adminHTML = String.raw`<!DOCTYPE html>
     -moz-appearance: none !important;
     appearance: none !important;
     padding: 0 !important;
-  }
-
-  /* Убираем стрелки в блоке времени Flatpickr */
-  .flatpickr-time input { 
-    -moz-appearance: textfield !important; 
-    font-size: 16px !important; 
-    font-weight: 600 !important; 
-    height: 40px !important; 
-    text-align: center !important;
-    pointer-events: auto;
-  }
-  .flatpickr-time input::-webkit-outer-spin-button,
-  .flatpickr-time input::-webkit-inner-spin-button { 
-    -webkit-appearance: none !important; 
-    margin: 0 !important; 
-    display: none !important;
+    font-weight: 600 !important;
   }
   .flatpickr-time .flatpickr-time-separator { 
     font-size: 18px !important; 
     font-weight: 600 !important; 
     color: var(--text) !important; 
+    line-height: 40px !important;
+  }
+
+  /* Делаем идеально ровный круг для выбранной даты */
+  .flatpickr-day.selected, 
+  .flatpickr-day.startRange, 
+  .flatpickr-day.endRange, 
+  .flatpickr-day.selected.inRange, 
+  .flatpickr-day.startRange.inRange, 
+  .flatpickr-day.endRange.inRange, 
+  .flatpickr-day.selected:focus, 
+  .flatpickr-day.startRange:focus, 
+  .flatpickr-day.endRange:focus, 
+  .flatpickr-day.selected:hover, 
+  .flatpickr-day.startRange:hover, 
+  .flatpickr-day.endRange:hover, 
+  .flatpickr-day.selected.prevMonthDay, 
+  .flatpickr-day.startRange.prevMonthDay, 
+  .flatpickr-day.endRange.prevMonthDay, 
+  .flatpickr-day.selected.nextMonthDay, 
+  .flatpickr-day.startRange.nextMonthDay, 
+  .flatpickr-day.endRange.nextMonthDay {
+    background: #0071e3 !important;
+    border-color: #0071e3 !important;
+    color: #fff !important;
+    border-radius: 50% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: none !important;
+    line-height: normal !important;
   }
   
-  /* Красивые кнопки выбора времени */
-  .flatpickr-time .numInputWrapper { height: 40px; }
-  .flatpickr-time .numInputWrapper span.arrowUp,
-  .flatpickr-time .numInputWrapper span.arrowDown { border: none; }
-
-  .flatpickr-day.selected { background: var(--accent) !important; border-color: var(--accent) !important; }
-  .flatpickr-day:hover { background: #f5f5f7; }
+  .flatpickr-day.today { border-color: #0071e3 !important; }
+  .flatpickr-day.today:hover { background: #0071e3 !important; color: #fff !important; }
+  
   .flatpickr-months { background: transparent; border-radius: 12px 12px 0 0; }
   .flatpickr-months .flatpickr-month { color: var(--text); height: 40px; }
   .flatpickr-weekdays { background: transparent; }
