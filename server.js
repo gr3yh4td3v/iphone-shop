@@ -248,7 +248,7 @@ app.post('/api/admin/login', (req, res) => {
 
 app.get('/api/admin/auth/telegram', (req, res) => {
   const { hash, ...data } = req.query;
-
+  
   if (!hash) return res.status(400).send('Отсутствует подпись Telegram');
 
   const checkString = Object.keys(data).sort().map(key => `${key}=${data[key]}`).join('\n');
@@ -269,7 +269,7 @@ app.get('/api/admin/export', auth, (req, res) => {
     const clean = (s) => '"' + String(s || '').replace(/"/g, '""') + '"';
     csv += `${p.id};${clean(p.brand)};${clean(p.model)};${p.price};${p.views||0};${p.orders||0};${p.favorites||0};${p.status};${clean(new Date(p.created_at).toLocaleString('ru-RU'))}\n`;
   });
-
+  
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="iphone-shop-db.csv"');
   res.send('\uFEFF' + csv);
@@ -497,17 +497,11 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-card .card-title, .favorite-card .card-title { font-size: 16px; }
   .recent-card .price, .favorite-card .price { font-size: 20px; }
   
-  /* Исправленная верстка для маленьких карточек (кнопка под ценой) */
+  /* Убираем кнопки в маленьких карточках для чистоты дизайна */
+  .recent-card .btn, .favorite-card .btn { display: none !important; }
   .recent-card .card-footer, .favorite-card .card-footer { 
-    flex-direction: column; 
-    align-items: stretch; 
-    gap: 8px; 
-  }
-  .recent-card .btn, .favorite-card .btn { 
-    padding: 8px 12px; 
-    font-size: 13px; 
-    width: 100%;
-    text-align: center;
+    justify-content: flex-start; 
+    padding-top: 8px;
   }
   .recent-card .status, .favorite-card .status { top: 10px; right: 10px; font-size: 11px; padding: 6px 10px; }
   .recent-card .hit-badge, .favorite-card .hit-badge { top: 10px; left: 10px; font-size: 11px; padding: 4px 8px; }
@@ -962,7 +956,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     }
     saveFavorites(favs);
 
-    // Отправляем сигнал на сервер для статистики
     fetch('/api/phone/' + id + '/favorite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1131,10 +1124,13 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
     var btn = '';
     
-    if (p.status === 'sold') {
-      btn = '<button class="btn" data-notify-btn="' + p.id + '">Уведомить</button>';
-    } else {
-      btn = '<button class="btn" data-order-btn="' + p.id + '">' + STATUS_BTN[p.status] + '</button>';
+    // Кнопку рендерим только для основной сетки
+    if (cardType === 'main') {
+      if (p.status === 'sold') {
+        btn = '<button class="btn" data-notify-btn="' + p.id + '">Уведомить</button>';
+      } else {
+        btn = '<button class="btn" data-order-btn="' + p.id + '">' + STATUS_BTN[p.status] + '</button>';
+      }
     }
 
     var now = new Date().getTime();
