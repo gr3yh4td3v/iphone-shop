@@ -693,7 +693,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .btn:disabled { background: #e5e5ea; color: #86868b; cursor: not-allowed; transform: none; }
   .empty { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 18px; }
 
-  .reviews-section { padding: 80px 0; background: #fff; border-top: 1px solid var(--border); scroll-margin-top: 80px; }
+  .reviews-section { padding: 80px 0; background: #fff; border-top: 1px solid var(--border); scroll-margin-top: 80px; transition: background-color 0.5s; }
   .reviews-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
   .reviews-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; }
   .reviews-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
@@ -759,9 +759,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  .detail-actions { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; max-width: 400px; }
-  .detail-actions .btn { flex: 1 1 calc(50% - 5px); justify-content: center; padding: 12px 10px; font-size: 14px; }
-  .detail-actions .btn:last-child { flex: 1 1 100%; }
+  /* ИСПРАВЛЕННЫЙ БЛОК С КНОПКАМИ */
+  .detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; }
+  .detail-actions .btn { width: 100%; justify-content: center; padding: 12px 10px; font-size: 14px; }
+  .detail-actions .btn:last-child { grid-column: 1 / -1; }
   
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 6px; }
   .btn-outline:hover { background: #f5f5f7; border-color: #a1a1a6; color: var(--text); transform: none; box-shadow: none; }
@@ -889,6 +890,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <div class="custom-option" data-value="newest">Сначала новые</div>
         </div>
       </div>
+
+      <button class="btn btn-secondary" onclick="scrollToReviews()" style="border-radius: 100px; padding: 14px 24px; font-weight: 500;">Читать отзывы</button>
     </div>
 
     <div class="filters" id="filters">
@@ -952,7 +955,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
         <h4>Компания</h4>
         <ul>
           <li><a onclick="showInfo('about')">О нас</a></li>
-          <li><a onclick="scrollToReviews()">Отзывы</a></li>
+          <li><a onclick="scrollToReviews()">Читать отзывы</a></li>
           <li><a onclick="showInfo('contacts')">Контакты</a></li>
         </ul>
       </div>
@@ -1753,15 +1756,13 @@ const indexHTML = String.raw`<!DOCTYPE html>
       const section = document.getElementById('reviews-section');
       section.scrollIntoView({ behavior: 'smooth' });
       
-      // Подсветим раздел, чтобы пользователь точно понял, куда его перенесло
-      section.style.transition = 'background-color 0.5s';
       section.style.backgroundColor = '#f0f7ff';
       setTimeout(() => {
         section.style.backgroundColor = '';
       }, 1500);
     } else {
       document.getElementById('info-title').textContent = 'Отзывы';
-      document.getElementById('info-text').innerHTML = '<p class="info-text-block">У нас пока нет опубликованных отзывов.<br><br>Но если вы уже совершили у нас покупку, мы будем очень рады, если вы поделитесь своим впечатлением!</p><button class="btn" style="margin-top:20px;" onclick="closeInfo(); openReview();">Оставить отзыв</button>';
+      document.getElementById('info-text').innerHTML = '<p class="info-text-block">У нас пока нет опубликованных отзывов.<br><br>Но если вы уже совершили у нас покупку, мы будем очень рады, если вы поделитесь своим впечатлением!</p><button class="btn btn-secondary" style="margin-top:20px; width: 100%;" onclick="closeInfo(); openReview();">Написать отзыв</button>';
       infoModal.classList.add('open');
     }
   };
