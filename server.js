@@ -796,10 +796,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
-  /* ИСПРАВЛЕНО ТУТ: Уменьшен gap до 16px, кнопка прижата влево */
+  /* ИСПРАВЛЕНО ТУТ: Кнопка растягивается на всю ширину */
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
   @media(min-width: 768px) { 
-    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: flex-start; gap: 16px; } 
+    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } 
   }
   
   .detail-price-wrap { display: flex; flex-direction: column; }
@@ -807,11 +807,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  /* ИСПРАВЛЕНО ТУТ: Убран margin-left: auto, чтобы кнопка не улетала вправо */
-  .detail-actions { display: flex; width: 100%; margin-left: 0; }
+  .detail-actions { display: flex; width: 100%; }
   @media(min-width: 768px) { 
-    .detail-actions { width: auto; min-width: 0; margin-left: 0; } 
-    .detail-actions .btn { padding: 16px 32px; font-size: 16px; }
+    .detail-actions { width: auto; min-width: 0; margin-left: 0; flex: 1; } 
+    .detail-actions .btn { width: 100%; padding: 16px 32px; font-size: 16px; text-align: center; }
   }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
