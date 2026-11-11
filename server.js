@@ -711,7 +711,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .trust-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); background: #f5f5f7; padding: 4px 8px; border-radius: 6px; font-weight: 500; }
   .trust-badge svg { width: 14px; height: 14px; color: #1a7f37; }
   
-  /* Кнопка убрана, поэтому элементы прижаты влево */
   .card-footer { display: flex; align-items: flex-end; justify-content: flex-start; gap: 16px; margin-top: auto; padding-top: 12px; }
   
   .price-wrap { display: flex; flex-direction: column; gap: 2px; }
@@ -781,7 +780,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-meta-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; gap: 16px; flex-wrap: wrap; }
   .detail-meta { color: var(--muted); font-size: 16px; margin-bottom: 0; }
   
-  .detail-icon-actions { display: flex; gap: 8px; flex-shrink: 0; }
   .btn-icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; padding: 0; }
   .btn-icon:hover { background: #f5f5f7; border-color: #a1a1a6; }
   .btn-icon svg { width: 20px; height: 20px; }
@@ -797,21 +795,21 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
-  /* ИСПРАВЛЕННЫЙ CSS ДЛЯ НИЖНЕГО БЛОКА В МОДАЛКЕ */
+  /* ИСПРАВЛЕНО ТУТ: Иконки перенесены вниз, к кнопке */
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
   @media(min-width: 768px) { 
-    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } 
+    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 16px; } 
   }
   
-  .detail-price-wrap { display: flex; flex-direction: column; }
+  .detail-price-wrap { display: flex; flex-direction: column; min-width: 170px; }
   .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; white-space: nowrap; }
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  .detail-actions { display: flex; width: 100%; }
+  .detail-actions { display: flex; width: 100%; align-items: center; gap: 12px; }
   @media(min-width: 768px) { 
-    .detail-actions { width: auto; min-width: 0; margin-left: auto; } 
-    .detail-actions .btn { padding: 16px 32px; font-size: 16px; }
+    .detail-actions { width: auto; min-width: 0; margin-left: 0; flex: 1; justify-content: flex-end; } 
+    .detail-actions .btn { flex: 1; padding: 16px 32px; font-size: 16px; text-align: center; }
   }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
@@ -1033,18 +1031,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
       
       <div class="detail-meta-row">
         <div class="detail-meta" id="detail-meta"></div>
-        <div class="detail-icon-actions">
-          <button class="btn-icon" id="detail-share-btn" title="Поделиться">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-              <polyline points="16 6 12 2 8 6"></polyline>
-              <line x1="12" y1="2" x2="12" y2="15"></line>
-            </svg>
-          </button>
-          <button class="btn-icon" id="detail-fav-btn" title="В избранное">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-          </button>
-        </div>
       </div>
 
       <div class="specs-grid" id="detail-specs"></div>
@@ -1078,7 +1064,18 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <div class="detail-price-old" id="detail-price-old" style="display:none;"></div>
           <div class="detail-price" id="detail-price"></div>
         </div>
+        
         <div class="detail-actions">
+          <button class="btn-icon" id="detail-share-btn" title="Поделиться">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+              <polyline points="16 6 12 2 8 6"></polyline>
+              <line x1="12" y1="2" x2="12" y2="15"></line>
+            </svg>
+          </button>
+          <button class="btn-icon" id="detail-fav-btn" title="В избранное">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          </button>
           <button class="btn" id="detail-order-btn">Забронировать</button>
         </div>
       </div>
@@ -1405,8 +1402,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var img = mainImg ? '<img src="' + mainImg + '" alt="" loading="lazy">' : phoneSvg;
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
     
-    // Блок с кнопкой удален
-
     var now = new Date().getTime();
     var isDiscounted = p.old_price && p.old_price > p.price;
     var hasTimer = p.discount_ends && new Date(p.discount_ends).getTime() > now;
@@ -1570,7 +1565,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   });
 
   function handleCardClick(e) {
-    // Обработка клика по кнопке удалена. Теперь клик по всей карточке открывает детали.
     var card = e.target.closest('[data-card]');
     if (card) {
       openDetail(Number(card.dataset.card));
