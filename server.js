@@ -711,7 +711,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .trust-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); background: #f5f5f7; padding: 4px 8px; border-radius: 6px; font-weight: 500; }
   .trust-badge svg { width: 14px; height: 14px; color: #1a7f37; }
   
-  /* Карточки на главной теперь без кнопок, поэтому justify-content: flex-start */
+  /* Кнопка убрана, поэтому элементы прижаты влево */
   .card-footer { display: flex; align-items: flex-end; justify-content: flex-start; gap: 16px; margin-top: auto; padding-top: 12px; }
   
   .price-wrap { display: flex; flex-direction: column; gap: 2px; }
@@ -797,22 +797,21 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
-  /* ЖЕСТКАЯ ФИКСАЦИЯ РАССТОЯНИЯ И РАЗМЕРА */
+  /* ИСПРАВЛЕННЫЙ CSS ДЛЯ НИЖНЕГО БЛОКА В МОДАЛКЕ */
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
   @media(min-width: 768px) { 
-    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: flex-start; gap: 24px; } 
+    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } 
   }
   
-  /* Блок цены фиксируем, чтобы кнопка не прыгала из-за "Старая цена" */
-  .detail-price-wrap { display: flex; flex-direction: column; min-width: 170px; }
+  .detail-price-wrap { display: flex; flex-direction: column; }
   .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; white-space: nowrap; }
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
   .detail-actions { display: flex; width: 100%; }
   @media(min-width: 768px) { 
-    .detail-actions { width: auto; min-width: 0; margin-left: 0; flex: 1; } 
-    .detail-actions .btn { width: 100%; padding: 16px 32px; font-size: 16px; text-align: center; }
+    .detail-actions { width: auto; min-width: 0; margin-left: auto; } 
+    .detail-actions .btn { padding: 16px 32px; font-size: 16px; }
   }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
@@ -1405,7 +1404,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var mainImg = p.images && p.images.length > 0 ? p.images[0] : '';
     var img = mainImg ? '<img src="' + mainImg + '" alt="" loading="lazy">' : phoneSvg;
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
-    var btn = ''; // Кнопка убрана из карточек на главной!
+    
+    // Блок с кнопкой удален
 
     var now = new Date().getTime();
     var isDiscounted = p.old_price && p.old_price > p.price;
@@ -1570,7 +1570,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   });
 
   function handleCardClick(e) {
-    // Кнопки на карточках больше нет, поэтому клик всегда открывает детали
+    // Обработка клика по кнопке удалена. Теперь клик по всей карточке открывает детали.
     var card = e.target.closest('[data-card]');
     if (card) {
       openDetail(Number(card.dataset.card));
