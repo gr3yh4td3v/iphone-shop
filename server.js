@@ -11,6 +11,7 @@ const DB_FILE = '/data/shop.json';
 app.use(express.json({ limit: '50mb' }));
 
 // ---------- БЕЗОПАСНОСТЬ ----------
+// Блокируем доступ к системным файлам и базе данных через браузер
 app.use((req, res, next) => {
   if (req.path.endsWith('.js') || req.path.endsWith('.json') || req.path.startsWith('/data/') || req.path === '/.env') {
     return res.status(403).send('Доступ запрещен');
@@ -25,7 +26,7 @@ function readDB() {
     const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     if (!Array.isArray(data.phones)) data.phones = [];
     if (!Array.isArray(data.reviews)) data.reviews = [];
-    if (!Array.isArray(data.tokens)) data.tokens = [];
+    if (!Array.isArray(data.tokens)) data.tokens = []; // Для токенов отзывов
     if (!data.nextId) data.nextId = data.phones.reduce((m, p) => Math.max(m, p.id || 0), 0) + 1;
     if (!data.nextReviewId) data.nextReviewId = data.reviews.reduce((m, r) => Math.max(m, r.id || 0), 0) + 1;
 
@@ -45,6 +46,7 @@ function readDB() {
   }
 }
 function writeDB(data) {
+  // Создаем папку, если ее нет
   const dir = path.dirname(DB_FILE);
   if (!fs.existsSync(dir)){
       fs.mkdirSync(dir, { recursive: true });
@@ -369,7 +371,7 @@ app.get('/api/reviews', (req, res) => {
   res.json(approved);
 });
 
-// ОТЗЫВЫ С ТОКЕНАМИ
+// ОТЗЫВЫ С ТОКЕНАМИ (Только для реальных покупателей)
 app.post('/api/review', async (req, res) => {
   const { name, text, rating, phone_model, token } = req.body || {};
   
@@ -378,11 +380,13 @@ app.post('/api/review', async (req, res) => {
 
   const db = readDB();
   
+  // Ищем токен и проверяем, не использован ли он
   const tokenIndex = db.tokens.findIndex(t => t.token === token && t.used === false);
   if (tokenIndex === -1) {
     return res.status(403).json({ ok: false, error: 'Недействительная или уже использованная ссылка на отзыв.' });
   }
 
+  // Помечаем токен использованным
   db.tokens[tokenIndex].used = true;
 
   const review = {
@@ -437,9 +441,10 @@ app.post('/api/order', async (req, res) => {
     phone.orders = (phone.orders || 0) + 1;
   }
 
+  // Генерируем секретный токен для отзыва
   const reviewToken = crypto.randomBytes(16).toString('hex');
   db.tokens.push({ token: reviewToken, used: false, created_at: Date.now() });
-  writeDB(db);
+  writeDB(db); // Сохраняем токен в базу
 
   const phoneLine = phone
     ? `<b>${esc(phone.brand)} ${esc(phone.model)}</b>\n💰 Цена: ${Number(phone.price).toLocaleString('ru-RU')} ₽`
@@ -711,6 +716,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .trust-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); background: #f5f5f7; padding: 4px 8px; border-radius: 6px; font-weight: 500; }
   .trust-badge svg { width: 14px; height: 14px; color: #1a7f37; }
   
+  /* ИСПРАВЛЕННЫЙ CSS ДЛЯ КНОПКИ */
   .card-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-top: auto; padding-top: 12px; }
   
   .price-wrap { display: flex; flex-direction: column; gap: 2px; }
@@ -721,6 +727,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .price.discounted { color: var(--red); }
   .timer-label { font-size: 11px; color: var(--red); font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
   
+  /* ИСПРАВЛЕННЫЙ CSS ДЛЯ КНОПКИ (flex-shrink) */
   .btn { border: none; border-radius: 14px; padding: 12px 24px; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--text); color: #fff; transition: all .2s; font-family: inherit; white-space: nowrap; flex-shrink: 0; }
   .btn:hover:not(:disabled) { background: #000; transform: scale(1.02); }
   .btn:disabled { background: #e5e5ea; color: #86868b; cursor: not-allowed; transform: none; }
@@ -796,7 +803,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
-  /* ИСПРАВЛЕНО ТУТ: Кнопка растягивается на всю ширину */
+  /* ИСПРАВЛЕННЫЙ CSS ДЛЯ НИЖНЕГО БЛОКА В МОДАЛКЕ */
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
   @media(min-width: 768px) { 
     .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } 
@@ -809,8 +816,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   
   .detail-actions { display: flex; width: 100%; }
   @media(min-width: 768px) { 
-    .detail-actions { width: auto; min-width: 0; margin-left: 0; flex: 1; } 
-    .detail-actions .btn { width: 100%; padding: 16px 32px; font-size: 16px; text-align: center; }
+    .detail-actions { width: auto; min-width: 0; margin-left: auto; } 
+    .detail-actions .btn { padding: 16px 32px; font-size: 16px; }
   }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
@@ -1348,6 +1355,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
       renderFavorites();
       renderRecent();
       
+      // Обработка ссылок из URL
       const urlParams = new URLSearchParams(window.location.search);
       const phoneId = urlParams.get('id');
       const reviewToken = urlParams.get('review');
@@ -1356,6 +1364,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
         setTimeout(function() { openDetail(Number(phoneId)); }, 100);
       }
       
+      // Если перешли по ссылке для отзыва
       if (reviewToken) {
         setTimeout(function() { 
           window.openReview(reviewToken); 
@@ -1739,7 +1748,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
         try {
           document.execCommand('copy');
           successCopy();
-        } catch (err) {}
+        } catch (err) {
+          // Игнорируем ошибку
+        }
         document.body.removeChild(textarea);
       }
     };
@@ -1800,6 +1811,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     if (ratingInput) ratingInput.value = 5;
     if (stars.length > 0) setStars(5);
     
+    // Сохраняем токен в скрытое поле формы
     let tokenInput = reviewForm.querySelector('input[name="token"]');
     if (!tokenInput) {
         tokenInput = document.createElement('input');
@@ -1826,6 +1838,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
         section.style.backgroundColor = '';
       }, 1500);
     } else {
+      // УЛУЧШЕННЫЙ ТЕКСТ ОТЗЫВОВ
       document.getElementById('info-title').textContent = 'Отзывы';
       document.getElementById('info-text').innerHTML = '<p class="info-text-block">Пока у нас нет опубликованных отзывов, но мы очень дорожим своей репутацией.<br><br>Мы верим в честность и прозрачность, поэтому оставлять отзывы могут только реальные покупатели. После совершения покупки мы обязательно отправим Вам персональную ссылку в Telegram, чтобы Вы могли поделиться своими впечатлениями. Ваше доверие — наша главная ценность!</p>';
       infoModal.classList.add('open');
