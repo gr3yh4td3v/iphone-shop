@@ -3,6 +3,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const sharp = require('sharp'); // Добавлена библиотека для работы с фото
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,58 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.static(__dirname, { dotfiles: 'deny' }));
+
+// ---------- ГЕНЕРАЦИЯ ССЫЛОК (SLUG) ----------
+function generateSlug(text) {
+  const map = {
+    'а':'a', 'б':'b', 'в':'v', 'г':'g', 'д':'d', 'е':'e', 'ё':'e', 'ж':'zh', 'з':'z', 'и':'i', 'й':'y', 'к':'k', 'л':'l', 'м':'m', 'н':'n', 'о':'o', 'п':'p', 'р':'r', 'с':'s', 'т':'t', 'у':'u', 'ф':'f', 'х':'h', 'ц':'ts', 'ч':'ch', 'ш':'sh', 'щ':'shch', 'ъ':'', 'ы':'y', 'ь':'', 'э':'e', 'ю':'yu', 'я':'ya'
+  };
+  return text.toLowerCase()
+    .split('')
+    .map(char => map[char] || char)
+    .join('')
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
+}
+
+// ---------- ОБРАБОТКА ФОТО (СЖАТИЕ + ВОДЯНОЙ ЗНАК) ----------
+async function processImages(images) {
+  if (!Array.isArray(images)) return [];
+  const processed = [];
+  
+  for (let img of images) {
+    // Если это base64 строка (новое фото)
+    if (img.startsWith('data:image')) {
+      try {
+        const base64Data = img.replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        // Сжимаем и меняем размер
+        let pipeline = sharp(buffer).resize({ width: 1200, withoutEnlargement: true }).jpeg({ quality: 85 });
+        
+        // Накладываем водяной знак, если файл logo.png существует в корне
+        const logoPath = path.join(__dirname, 'logo.png');
+        if (fs.existsSync(logoPath)) {
+          const logo = await sharp(logoPath).resize({ width: 150 }).toBuffer();
+          pipeline = pipeline.composite([{ input: logo, gravity: 'southeast' }]);
+        }
+        
+        const processedBuffer = await pipeline.toBuffer();
+        processed.push(`data:image/jpeg;base64,${processedBuffer.toString('base64')}`);
+      } catch (e) {
+        console.error('❌ Ошибка обработки изображения:', e.message);
+        processed.push(img); // Если ошибка, оставляем оригинал
+      }
+    } else {
+      // Если это не base64 (старое фото или URL), оставляем как есть
+      processed.push(img);
+    }
+  }
+  return processed;
+}
 
 // ---------- Storage (JSON) ----------
 function readDB() {
@@ -37,6 +90,7 @@ function readDB() {
       if (p.favorites === undefined) p.favorites = 0;
       if (p.channel_message_id === undefined) p.channel_message_id = null;
       if (p.channel_kind === undefined) p.channel_kind = null;
+      if (p.slug === undefined) p.slug = null; // Новое поле для SEO
     });
 
     return data;
@@ -139,7 +193,7 @@ function buildProductCaption(phone, siteUrl) {
 async function notifyProductAdded(phone) {
   if (!process.env.BOT_TOKEN || !process.env.CHAT_ID) return;
   const apiBase = getTelegramApiBase();
-  const siteUrl = `https://iphone-shop.up.railway.app/?id=${phone.id}`;
+  const siteUrl = `https://iphone-shop.up.railway.app/${phone.slug || '?id=' + phone.id}`;
 
   let text = `➕ <b>Добавлен товар</b>\n\n` +
              `📱 <b>${esc(phone.brand)} ${esc(phone.model)}</b>\n` +
@@ -190,7 +244,7 @@ async function notifyProductAdded(phone) {
 async function postToChannel(phone, opts = {}) {
   if (!process.env.BOT_TOKEN || !process.env.CHANNEL_ID) return null;
   const apiBase = getTelegramApiBase();
-  const siteUrl = `https://iphone-shop.up.railway.app/?id=${phone.id}`;
+  const siteUrl = `https://iphone-shop.up.railway.app/${phone.slug || '?id=' + phone.id}`;
   const caption = buildProductCaption(phone, siteUrl);
   const silent = opts.silent === true;
 
@@ -292,7 +346,7 @@ async function syncChannelPost(prev, updated) {
   }
 
   const apiBase = getTelegramApiBase();
-  const siteUrl = `https://iphone-shop.up.railway.app/?id=${updated.id}`;
+  const siteUrl = `https://iphone-shop.up.railway.app/${updated.slug || '?id=' + updated.id}`;
   const caption = buildProductCaption(updated, siteUrl);
   const kind = updated.channel_kind || 'photo';
   const endpoint = kind === 'text' ? 'editMessageText' : 'editMessageCaption';
@@ -548,8 +602,19 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   }
 
   let finalStatus = STATUSES.includes(status) ? status : 'available';
+  let processedImages = await processImages(images); // Обработка фото
 
   const db = readDB();
+  
+  // Генерация уникального slug
+  let baseSlug = generateSlug(`${brand} ${model} ${storage}`);
+  let slug = baseSlug;
+  let counter = 1;
+  while (db.phones.some(p => p.slug === slug)) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+
   const phone = {
     id: db.nextId++,
     brand: String(brand).slice(0, 100),
@@ -561,13 +626,14 @@ app.post('/api/admin/phones', auth, async (req, res) => {
     discount_ends: finalDiscountEnds,
     condition: condition || 'Новый',
     description: description || '',
-    images: Array.isArray(images) ? images : [],
+    images: processedImages,
     battery: battery || '',
     kit: kit || '',
     sim: sim || '',
     imei: imei || '',
     is_hit: is_hit === true,
     status: finalStatus,
+    slug: slug, // Сохраняем slug
     views: 0,
     orders: 0,
     favorites: 0,
@@ -593,7 +659,11 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
   if (idx === -1) return res.status(404).json({ ok: false, error: 'Не найдено' });
 
   const prev = db.phones[idx];
-  const updated = { ...prev, ...req.body, id, price: Number(req.body.price || prev.price) };
+  
+  // Обработка фото при редактировании
+  let processedImages = req.body.images ? await processImages(req.body.images) : prev.images;
+
+  const updated = { ...prev, ...req.body, id, price: Number(req.body.price || prev.price), images: processedImages };
   if (!STATUSES.includes(updated.status)) updated.status = prev.status;
 
   if (updated.old_price && Number(updated.old_price) > updated.price) {
@@ -602,6 +672,18 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
   } else {
     updated.old_price = null;
     updated.discount_ends = null;
+  }
+
+  // Обновляем slug, если изменилось название
+  if (req.body.brand || req.body.model || req.body.storage) {
+    let baseSlug = generateSlug(`${updated.brand} ${updated.model} ${updated.storage}`);
+    let slug = baseSlug;
+    let counter = 1;
+    while (db.phones.some(p => p.id !== id && p.slug === slug)) {
+      slug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+    updated.slug = slug;
   }
 
   db.phones[idx] = updated;
@@ -651,12 +733,17 @@ app.delete('/api/admin/phones/:id', auth, async (req, res) => {
 //                     HTML PAGES
 // ============================================================
 
+// Внедряем плейсхолдеры для SEO прямо в HTML
 const indexHTML = String.raw`<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>iPhone | Shop — премиальная техника</title>
+<title>__TITLE__</title>
+<meta name="description" content="__DESC__">
+<meta property="og:title" content="__TITLE__">
+<meta property="og:description" content="__DESC__">
+<meta property="og:image" content="__IMAGE__">
 <link rel="icon" type="image/png" href="/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -780,6 +867,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-meta-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; gap: 16px; flex-wrap: wrap; }
   .detail-meta { color: var(--muted); font-size: 16px; margin-bottom: 0; }
   
+  .detail-icon-actions { display: flex; gap: 8px; flex-shrink: 0; }
   .btn-icon { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; padding: 0; }
   .btn-icon:hover { background: #f5f5f7; border-color: #a1a1a6; }
   .btn-icon svg { width: 20px; height: 20px; }
@@ -795,21 +883,20 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
-  /* ИСПРАВЛЕНО ТУТ: Иконки перенесены вниз, к кнопке */
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
   @media(min-width: 768px) { 
-    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 16px; } 
+    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } 
   }
   
-  .detail-price-wrap { display: flex; flex-direction: column; min-width: 170px; }
+  .detail-price-wrap { display: flex; flex-direction: column; }
   .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; white-space: nowrap; }
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
   
-  .detail-actions { display: flex; width: 100%; align-items: center; gap: 12px; }
+  .detail-actions { display: flex; width: 100%; }
   @media(min-width: 768px) { 
-    .detail-actions { width: auto; min-width: 0; margin-left: 0; flex: 1; justify-content: flex-end; } 
-    .detail-actions .btn { flex: 1; padding: 16px 32px; font-size: 16px; text-align: center; }
+    .detail-actions { width: auto; min-width: 0; margin-left: auto; } 
+    .detail-actions .btn { padding: 16px 32px; font-size: 16px; }
   }
 
   .order-modal, .review-modal { max-width: 460px; padding: 40px; }
@@ -1031,6 +1118,18 @@ const indexHTML = String.raw`<!DOCTYPE html>
       
       <div class="detail-meta-row">
         <div class="detail-meta" id="detail-meta"></div>
+        <div class="detail-icon-actions">
+          <button class="btn-icon" id="detail-share-btn" title="Поделиться">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+              <polyline points="16 6 12 2 8 6"></polyline>
+              <line x1="12" y1="2" x2="12" y2="15"></line>
+            </svg>
+          </button>
+          <button class="btn-icon" id="detail-fav-btn" title="В избранное">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          </button>
+        </div>
       </div>
 
       <div class="specs-grid" id="detail-specs"></div>
@@ -1064,18 +1163,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
           <div class="detail-price-old" id="detail-price-old" style="display:none;"></div>
           <div class="detail-price" id="detail-price"></div>
         </div>
-        
         <div class="detail-actions">
-          <button class="btn-icon" id="detail-share-btn" title="Поделиться">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-              <polyline points="16 6 12 2 8 6"></polyline>
-              <line x1="12" y1="2" x2="12" y2="15"></line>
-            </svg>
-          </button>
-          <button class="btn-icon" id="detail-fav-btn" title="В избранное">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-          </button>
           <button class="btn" id="detail-order-btn">Забронировать</button>
         </div>
       </div>
@@ -1349,9 +1437,16 @@ const indexHTML = String.raw`<!DOCTYPE html>
       const urlParams = new URLSearchParams(window.location.search);
       const phoneId = urlParams.get('id');
       const reviewToken = urlParams.get('review');
+      const pathSlug = window.location.pathname.replace('/', '');
       
       if (phoneId) {
         setTimeout(function() { openDetail(Number(phoneId)); }, 100);
+      } else if (pathSlug && pathSlug !== 'admin' && pathSlug !== 'admin.html' && pathSlug !== '') {
+        // Умный поиск по slug
+        const p = allPhones.find(x => x.slug === pathSlug);
+        if (p) {
+            setTimeout(function() { openDetail(p.id); }, 100);
+        }
       }
       
       if (reviewToken) {
@@ -1399,7 +1494,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
   function buildCardHtml(p, cardType) {
     var mainImg = p.images && p.images.length > 0 ? p.images[0] : '';
-    var img = mainImg ? '<img src="' + mainImg + '" alt="" loading="lazy">' : phoneSvg;
+    var img = mainImg ? '<img src="' + mainImg + '" alt="' + esc(p.brand) + ' ' + esc(p.model) + '">' : phoneSvg;
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
     
     var now = new Date().getTime();
@@ -1582,6 +1677,11 @@ const indexHTML = String.raw`<!DOCTYPE html>
     trackView(id); 
     currentDetailId = id;
 
+    // Меняем URL в браузере на красивый slug без перезагрузки страницы
+    if (p.slug) {
+        window.history.replaceState({}, p.brand + ' ' + p.model, '/' + p.slug);
+    }
+
     var mainBox = document.getElementById('detail-main-img-box');
     var thumbsBox = document.getElementById('detail-thumbs-box');
     
@@ -1668,6 +1768,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   window.closeDetail = function() { 
     detailModal.classList.remove('open'); 
     currentDetailId = null; 
+    // Возвращаем URL на главную при закрытии
+    window.history.replaceState({}, document.title, '/');
   };
 
   document.getElementById('detail-share-btn').addEventListener('click', async function() {
@@ -1675,7 +1777,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
     const p = allPhones.find(x => x.id === currentDetailId);
     if (!p) return;
 
-    const shareUrl = window.location.origin + '/?id=' + p.id;
+    // Используем красивыю ссылку для шаринга
+    const shareUrl = window.location.origin + '/' + (p.slug || '?id=' + p.id);
     const priceFormatted = Number(p.price).toLocaleString('ru-RU') + ' ₽';
     
     let shareText = '🔥 Смотри, какой аппарат нашел:\n';
@@ -3116,7 +3219,46 @@ const adminHTML = String.raw`<!DOCTYPE html>
 // ============================================================
 //                        ROUTES
 // ============================================================
-app.get('/', (req, res) => res.type('html').send(indexHTML));
+
+// Главная страница и умный роутинг для SEO (красивые ссылки)
+app.get('/', (req, res) => {
+  let html = indexHTML;
+  html = html.replace(/__TITLE__/g, 'iPhone | Shop — премиальная техника')
+             .replace(/__DESC__/g, 'Бутик проверенных смартфонов. Берем на себя все риски покупки с рук: личный отбор, полная диагностика и честные цены без переплат магазинам.')
+             .replace(/__IMAGE__/g, '/logo.png');
+  res.type('html').send(html);
+});
+
+app.get('/:slug', (req, res, next) => {
+  const slug = req.params.slug;
+  
+  // Пропускаем системные пути
+  if (slug === 'admin' || slug === 'admin.html' || slug === 'api') return next();
+
+  const db = readDB();
+  const phone = db.phones.find(p => p.slug === slug && p.status !== 'draft');
+
+  if (phone) {
+    let html = indexHTML;
+    let title = `${phone.brand} ${phone.model} ${phone.storage} — купить в iPhone|Shop`;
+    let desc = `Купить ${phone.brand} ${phone.model} за ${Number(phone.price).toLocaleString('ru-RU')} ₽. ${phone.description || 'Проверенное устройство в отличном состоянии.'}`.slice(0, 160);
+    let img = phone.images && phone.images.length > 0 ? phone.images[0] : '/logo.png';
+
+    html = html.replace(/__TITLE__/g, title)
+               .replace(/__DESC__/g, desc)
+               .replace(/__IMAGE__/g, img);
+               
+    res.type('html').send(html);
+  } else {
+    // Если slug не найден, отдаем 404 или главную
+    let html = indexHTML;
+    html = html.replace(/__TITLE__/g, 'Товар не найден — iPhone | Shop')
+               .replace(/__DESC__/g, 'Запрашиваемый товар не найден.')
+               .replace(/__IMAGE__/g, '/logo.png');
+    res.status(404).type('html').send(html);
+  }
+});
+
 app.get('/admin', (req, res) => res.type('html').send(adminHTML));
 app.get('/admin.html', (req, res) => res.type('html').send(adminHTML));
 
