@@ -47,7 +47,6 @@ async function processImages(images) {
         const base64Data = img.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, 'base64');
         
-        // Сжимаем фото
         const resizedBuffer = await sharp(buffer)
           .resize({ width: 1200, withoutEnlargement: true })
           .jpeg({ quality: 85 })
@@ -56,7 +55,7 @@ async function processImages(images) {
         processed.push(`data:image/jpeg;base64,${resizedBuffer.toString('base64')}`);
       } catch (e) {
         console.error('❌ Ошибка обработки изображения:', e.message);
-        processed.push(img); // Если ошибка, оставляем оригинал
+        processed.push(img); 
       }
     } else {
       processed.push(img);
@@ -818,7 +817,10 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-section, .favorites-section { padding-bottom: 80px; display: none; }
   .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
   .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
-  .recent-grid, .favorites-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scroll-snap-type: x mandatory; scroll-behavior: smooth; }
+  
+  /* ИСПРАВЛЕНО: proximity вместо mandatory для плавной прокрутки */
+  .recent-grid, .favorites-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scroll-snap-type: x proximity; scroll-behavior: smooth; }
+  
   .recent-grid::-webkit-scrollbar, .favorites-grid::-webkit-scrollbar { height: 6px; }
   .recent-card, .favorite-card { min-width: 240px; max-width: 240px; scroll-snap-align: start; }
   .recent-card .card-img, .favorite-card .card-img { aspect-ratio: 1; }
@@ -1404,9 +1406,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var el = document.getElementById(containerId);
     if (el) {
       el.addEventListener('wheel', function(e) {
-        var isAtEnd = this.scrollWidth - this.scrollLeft <= this.clientWidth;
-        var isAtStart = this.scrollLeft === 0;
-        if ((e.deltaY > 0 && !isAtEnd) || (e.deltaY < 0 && !isAtStart)) {
+        if (e.deltaY !== 0) {
           e.preventDefault();
           this.scrollLeft += e.deltaY;
         }
@@ -1590,7 +1590,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     try { recent = JSON.parse(localStorage.getItem('recently_viewed') || '[]'); } catch(e) {}
     recent = recent.filter(function(x) { return x !== id; });
     recent.unshift(id);
-    if (recent.length > 5) recent.pop();
+    if (recent.length > 20) recent.pop(); // Увеличили лимит до 20
     localStorage.setItem('recently_viewed', JSON.stringify(recent));
   }
 
