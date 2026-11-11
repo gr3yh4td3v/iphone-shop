@@ -797,13 +797,14 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-trust-badges .trust-badge { font-size: 14px; padding: 8px 12px; background: #fff; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
   .detail-trust-badges .trust-badge svg { width: 16px; height: 16px; }
   
-  /* В модальном окне кнопка растягивается на всю доступную ширину */
+  /* ЖЕСТКАЯ ФИКСАЦИЯ РАССТОЯНИЯ И РАЗМЕРА */
   .detail-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 32px; display: flex; flex-direction: column; gap: 20px; }
   @media(min-width: 768px) { 
-    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 24px; } 
+    .detail-bottom { flex-direction: row; align-items: flex-end; justify-content: flex-start; gap: 24px; } 
   }
   
-  .detail-price-wrap { display: flex; flex-direction: column; }
+  /* Блок цены фиксируем, чтобы кнопка не прыгала из-за "Старая цена" */
+  .detail-price-wrap { display: flex; flex-direction: column; min-width: 170px; }
   .detail-price-old { font-size: 18px; color: var(--muted); text-decoration: line-through; margin-bottom: 4px; white-space: nowrap; }
   .detail-price { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; white-space: nowrap; }
   .detail-price.discounted { color: var(--red); }
