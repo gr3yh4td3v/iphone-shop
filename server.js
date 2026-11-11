@@ -3,7 +3,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const sharp = require('sharp'); // Добавлена библиотека для работы с фото
+const sharp = require('sharp');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,36 +36,56 @@ function generateSlug(text) {
     .replace(/-+$/, '');
 }
 
-// ---------- ОБРАБОТКА ФОТО (СЖАТИЕ + ВОДЯНОЙ ЗНАК) ----------
+// ---------- ОБРАБОТКА ФОТО (СЖАТИЕ + КРАСИВЫЙ ВОДЯНОЙ ЗНАК) ----------
 async function processImages(images) {
   if (!Array.isArray(images)) return [];
   const processed = [];
   
   for (let img of images) {
-    // Если это base64 строка (новое фото)
     if (img.startsWith('data:image')) {
       try {
         const base64Data = img.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, 'base64');
         
-        // Сжимаем и меняем размер
-        let pipeline = sharp(buffer).resize({ width: 1200, withoutEnlargement: true }).jpeg({ quality: 85 });
-        
-        // Накладываем водяной знак, если файл logo.png существует в корне
-        const logoPath = path.join(__dirname, 'logo.png');
-        if (fs.existsSync(logoPath)) {
-          const logo = await sharp(logoPath).resize({ width: 150 }).toBuffer();
-          pipeline = pipeline.composite([{ input: logo, gravity: 'southeast' }]);
-        }
-        
-        const processedBuffer = await pipeline.toBuffer();
-        processed.push(`data:image/jpeg;base64,${processedBuffer.toString('base64')}`);
+        // 1. Сжимаем фото
+        const resizedBuffer = await sharp(buffer)
+          .resize({ width: 1200, withoutEnlargement: true })
+          .jpeg({ quality: 85 })
+          .toBuffer();
+          
+        // 2. Получаем точные размеры уже сжатого фото
+        const metadata = await sharp(resizedBuffer).metadata();
+        const width = metadata.width;
+        const height = metadata.height;
+
+        // 3. Генерируем красивый SVG водяной знак (текст на полупрозрачном фоне)
+        const wmWidth = Math.floor(width * 0.35); 
+        const wmHeight = Math.floor(wmWidth * 0.22);
+        const margin = 20; // Отступ от краев
+
+        const svgText = `
+          <svg width="${wmWidth}" height="${wmHeight}">
+            <rect width="100%" height="100%" rx="10" fill="rgba(0,0,0,0.4)" />
+            <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="${wmHeight * 0.4}px" font-weight="bold" fill="rgba(255,255,255,0.9)">iPhone | Shop</text>
+          </svg>
+        `;
+        const wmBuffer = Buffer.from(svgText);
+
+        // 4. Накладываем плашку в правый нижний угол
+        const finalBuffer = await sharp(resizedBuffer)
+          .composite([{
+            input: wmBuffer,
+            left: Math.max(0, width - wmWidth - margin),
+            top: Math.max(0, height - wmHeight - margin)
+          }])
+          .toBuffer();
+          
+        processed.push(`data:image/jpeg;base64,${finalBuffer.toString('base64')}`);
       } catch (e) {
         console.error('❌ Ошибка обработки изображения:', e.message);
-        processed.push(img); // Если ошибка, оставляем оригинал
+        processed.push(img);
       }
     } else {
-      // Если это не base64 (старое фото или URL), оставляем как есть
       processed.push(img);
     }
   }
@@ -90,7 +110,7 @@ function readDB() {
       if (p.favorites === undefined) p.favorites = 0;
       if (p.channel_message_id === undefined) p.channel_message_id = null;
       if (p.channel_kind === undefined) p.channel_kind = null;
-      if (p.slug === undefined) p.slug = null; // Новое поле для SEO
+      if (p.slug === undefined) p.slug = null;
     });
 
     return data;
@@ -602,11 +622,10 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   }
 
   let finalStatus = STATUSES.includes(status) ? status : 'available';
-  let processedImages = await processImages(images); // Обработка фото
+  let processedImages = await processImages(images);
 
   const db = readDB();
   
-  // Генерация уникального slug
   let baseSlug = generateSlug(`${brand} ${model} ${storage}`);
   let slug = baseSlug;
   let counter = 1;
@@ -633,7 +652,7 @@ app.post('/api/admin/phones', auth, async (req, res) => {
     imei: imei || '',
     is_hit: is_hit === true,
     status: finalStatus,
-    slug: slug, // Сохраняем slug
+    slug: slug,
     views: 0,
     orders: 0,
     favorites: 0,
@@ -660,7 +679,6 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
 
   const prev = db.phones[idx];
   
-  // Обработка фото при редактировании
   let processedImages = req.body.images ? await processImages(req.body.images) : prev.images;
 
   const updated = { ...prev, ...req.body, id, price: Number(req.body.price || prev.price), images: processedImages };
@@ -674,7 +692,6 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
     updated.discount_ends = null;
   }
 
-  // Обновляем slug, если изменилось название
   if (req.body.brand || req.body.model || req.body.storage) {
     let baseSlug = generateSlug(`${updated.brand} ${updated.model} ${updated.storage}`);
     let slug = baseSlug;
@@ -1442,7 +1459,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
       if (phoneId) {
         setTimeout(function() { openDetail(Number(phoneId)); }, 100);
       } else if (pathSlug && pathSlug !== 'admin' && pathSlug !== 'admin.html' && pathSlug !== '') {
-        // Умный поиск по slug
         const p = allPhones.find(x => x.slug === pathSlug);
         if (p) {
             setTimeout(function() { openDetail(p.id); }, 100);
@@ -1777,7 +1793,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     const p = allPhones.find(x => x.id === currentDetailId);
     if (!p) return;
 
-    // Используем красивыю ссылку для шаринга
     const shareUrl = window.location.origin + '/' + (p.slug || '?id=' + p.id);
     const priceFormatted = Number(p.price).toLocaleString('ru-RU') + ' ₽';
     
