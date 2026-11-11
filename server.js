@@ -36,7 +36,7 @@ function generateSlug(text) {
     .replace(/-+$/, '');
 }
 
-// ---------- ОБРАБОТКА ФОТО (СЖАТИЕ + ТЕКСТОВЫЙ ВОДЯНОЙ ЗНАК) ----------
+// ---------- ОБРАБОТКА ФОТО (ТОЛЬКО СЖАТИЕ, БЕЗ ВОДЯНЫХ ЗНАКОВ) ----------
 async function processImages(images) {
   if (!Array.isArray(images)) return [];
   const processed = [];
@@ -47,39 +47,13 @@ async function processImages(images) {
         const base64Data = img.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, 'base64');
         
-        // 1. Сжимаем фото
+        // Сжимаем фото
         const resizedBuffer = await sharp(buffer)
           .resize({ width: 1200, withoutEnlargement: true })
           .jpeg({ quality: 85 })
           .toBuffer();
           
-        const metadata = await sharp(resizedBuffer).metadata();
-        const width = metadata.width;
-        const height = metadata.height;
-
-        // 2. Генерируем текстовый водяной знак
-        const wmWidth = 320; // Ширина плашки
-        const wmHeight = 80; // Высота плашки
-        const margin = 25;   // Отступ от краев
-
-        const svgText = `
-          <svg width="${wmWidth}" height="${wmHeight}" xmlns="http://www.w3.org/2000/svg">
-            <rect width="${wmWidth}" height="${wmHeight}" rx="12" fill="rgba(0,0,0,0.5)" />
-            <text x="50%" y="54%" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">iPhone | Shop</text>
-          </svg>
-        `;
-        const wmBuffer = Buffer.from(svgText);
-
-        // 3. Накладываем в правый нижний угол
-        const finalBuffer = await sharp(resizedBuffer)
-          .composite([{
-            input: wmBuffer,
-            left: Math.max(0, width - wmWidth - margin),
-            top: Math.max(0, height - wmHeight - margin)
-          }])
-          .toBuffer();
-          
-        processed.push(`data:image/jpeg;base64,${finalBuffer.toString('base64')}`);
+        processed.push(`data:image/jpeg;base64,${resizedBuffer.toString('base64')}`);
       } catch (e) {
         console.error('❌ Ошибка обработки изображения:', e.message);
         processed.push(img); // Если ошибка, оставляем оригинал
