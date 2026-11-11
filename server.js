@@ -53,25 +53,24 @@ async function processImages(images) {
           .jpeg({ quality: 85 })
           .toBuffer();
           
-        // 2. Получаем точные размеры уже сжатого фото
         const metadata = await sharp(resizedBuffer).metadata();
         const width = metadata.width;
         const height = metadata.height;
 
-        // 3. Генерируем красивый SVG водяной знак (текст на полупрозрачном фоне)
-        const wmWidth = Math.floor(width * 0.35); 
-        const wmHeight = Math.floor(wmWidth * 0.22);
+        // 2. Генерируем фиксированный водяной знак 300x80
+        const wmWidth = 300;
+        const wmHeight = 80;
         const margin = 20; // Отступ от краев
 
         const svgText = `
-          <svg width="${wmWidth}" height="${wmHeight}">
-            <rect width="100%" height="100%" rx="10" fill="rgba(0,0,0,0.4)" />
-            <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="${wmHeight * 0.4}px" font-weight="bold" fill="rgba(255,255,255,0.9)">iPhone | Shop</text>
+          <svg width="${wmWidth}" height="${wmHeight}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="${wmWidth}" height="${wmHeight}" rx="12" fill="rgba(0,0,0,0.65)" />
+            <text x="50%" y="54%" font-family="Arial, sans-serif" font-size="26" font-weight="bold" fill="rgba(255,255,255,0.95)" text-anchor="middle" dominant-baseline="middle">iPhone | Shop</text>
           </svg>
         `;
         const wmBuffer = Buffer.from(svgText);
 
-        // 4. Накладываем плашку в правый нижний угол
+        // 3. Накладываем в правый нижний угол
         const finalBuffer = await sharp(resizedBuffer)
           .composite([{
             input: wmBuffer,
@@ -83,7 +82,7 @@ async function processImages(images) {
         processed.push(`data:image/jpeg;base64,${finalBuffer.toString('base64')}`);
       } catch (e) {
         console.error('❌ Ошибка обработки изображения:', e.message);
-        processed.push(img);
+        processed.push(img); // Если ошибка, оставляем оригинал
       }
     } else {
       processed.push(img);
@@ -750,7 +749,6 @@ app.delete('/api/admin/phones/:id', auth, async (req, res) => {
 //                     HTML PAGES
 // ============================================================
 
-// Внедряем плейсхолдеры для SEO прямо в HTML
 const indexHTML = String.raw`<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1693,7 +1691,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
     trackView(id); 
     currentDetailId = id;
 
-    // Меняем URL в браузере на красивый slug без перезагрузки страницы
     if (p.slug) {
         window.history.replaceState({}, p.brand + ' ' + p.model, '/' + p.slug);
     }
@@ -1784,7 +1781,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   window.closeDetail = function() { 
     detailModal.classList.remove('open'); 
     currentDetailId = null; 
-    // Возвращаем URL на главную при закрытии
     window.history.replaceState({}, document.title, '/');
   };
 
