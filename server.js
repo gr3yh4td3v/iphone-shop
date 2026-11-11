@@ -36,7 +36,7 @@ function generateSlug(text) {
     .replace(/-+$/, '');
 }
 
-// ---------- ОБРАБОТКА ФОТО (СЖАТИЕ + КРАСИВЫЙ ВОДЯНОЙ ЗНАК) ----------
+// ---------- ОБРАБОТКА ФОТО (СЖАТИЕ + ТЕКСТОВЫЙ ВОДЯНОЙ ЗНАК) ----------
 async function processImages(images) {
   if (!Array.isArray(images)) return [];
   const processed = [];
@@ -57,15 +57,15 @@ async function processImages(images) {
         const width = metadata.width;
         const height = metadata.height;
 
-        // 2. Генерируем фиксированный водяной знак 300x80
-        const wmWidth = 300;
-        const wmHeight = 80;
-        const margin = 20; // Отступ от краев
+        // 2. Генерируем текстовый водяной знак
+        const wmWidth = 320; // Ширина плашки
+        const wmHeight = 80; // Высота плашки
+        const margin = 25;   // Отступ от краев
 
         const svgText = `
           <svg width="${wmWidth}" height="${wmHeight}" xmlns="http://www.w3.org/2000/svg">
-            <rect width="${wmWidth}" height="${wmHeight}" rx="12" fill="rgba(0,0,0,0.65)" />
-            <text x="50%" y="54%" font-family="Arial, sans-serif" font-size="26" font-weight="bold" fill="rgba(255,255,255,0.95)" text-anchor="middle" dominant-baseline="middle">iPhone | Shop</text>
+            <rect width="${wmWidth}" height="${wmHeight}" rx="12" fill="rgba(0,0,0,0.5)" />
+            <text x="50%" y="54%" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">iPhone | Shop</text>
           </svg>
         `;
         const wmBuffer = Buffer.from(svgText);
