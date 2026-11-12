@@ -71,7 +71,7 @@ function readDB() {
     if (!Array.isArray(data.phones)) data.phones = [];
     if (!Array.isArray(data.reviews)) data.reviews = [];
     if (!Array.isArray(data.tokens)) data.tokens = [];
-    if (!Array.isArray(data.notifications)) data.notifications = []; // Для заявок на уведомление
+    if (!Array.isArray(data.notifications)) data.notifications = [];
     if (!data.nextId) data.nextId = data.phones.reduce((m, p) => Math.max(m, p.id || 0), 0) + 1;
     if (!data.nextReviewId) data.nextReviewId = data.reviews.reduce((m, r) => Math.max(m, r.id || 0), 0) + 1;
 
@@ -772,7 +772,22 @@ const indexHTML = String.raw`<!DOCTYPE html>
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100vh; }
   .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; width: 100%; }
   
-  header { background: rgba(251, 251, 253, 0.85); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+  /* Плавное скрытие шапки */
+  header { 
+    background: rgba(251, 251, 253, 0.85); 
+    -webkit-backdrop-filter: blur(20px); 
+    backdrop-filter: blur(20px); 
+    border-bottom: 1px solid var(--border); 
+    position: sticky; 
+    top: 0; 
+    z-index: 50; 
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); 
+    will-change: transform;
+  }
+  header.header-hidden { 
+    transform: translateY(-100%); 
+  }
+  
   .header-inner { display: flex; align-items: center; justify-content: center; height: 72px; }
   .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; cursor: default; display: flex; align-items: center; gap: 12px; white-space: nowrap; }
   .logo img { height: 42px; width: auto; object-fit: contain; }
@@ -794,8 +809,28 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .card.sold .card-img img { filter: grayscale(100%) opacity(0.7); }
   .card.sold .card-title { color: var(--muted); }
   .card.sold .price { color: var(--muted); }
-  .card-img { aspect-ratio: 4/5; background: #f5f5f7; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  .card-img img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s ease; }
+
+  /* Одинаковый размер фото (как на Авито) */
+  .card-img { 
+    aspect-ratio: 4/5; 
+    width: 100%;
+    flex-shrink: 0;
+    background: #f5f5f7; 
+    position: relative; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    overflow: hidden; 
+  }
+  .card-img img { 
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    transition: transform .6s ease; 
+  }
   .card:hover .card-img img { transform: scale(1.04); }
   .card-img svg { width: 64px; height: 64px; color: var(--border); }
   
@@ -881,6 +916,29 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .zoom-overlay.open { display: flex; opacity: 1; }
   .zoom-img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
 
+  /* Кнопка закрытия зума */
+  .zoom-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2001;
+    transition: background 0.2s;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  .zoom-close:hover { background: rgba(255, 255, 255, 0.4); }
+  .zoom-close svg { width: 24px; height: 24px; }
+
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; opacity: 0; transition: opacity .3s ease; }
   .modal-overlay.open { display: flex; opacity: 1; }
   .modal { background: #fff; border-radius: 32px; width: 100%; animation: pop .4s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden; }
@@ -896,9 +954,37 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-thumb { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 2px solid transparent; transition: border-color .2s; }
   .detail-thumb:hover, .detail-thumb.active { border-color: var(--accent); }
   .detail-content { flex: 1; padding: 48px; display: flex; flex-direction: column; overflow-y: auto; }
-  .detail-close { position: absolute; top: 24px; right: 24px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(0,0,0,0.05); color: var(--text); font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s; z-index: 10; }
-  .detail-close:hover { background: rgba(0,0,0,0.1); }
   
+  /* Идеальный крестик в карточке товара */
+  .detail-close { 
+    position: absolute; 
+    top: 16px; 
+    right: 16px; 
+    width: 44px; 
+    height: 44px; 
+    border-radius: 50%; 
+    border: none; 
+    background: rgba(255, 255, 255, 0.9); 
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: #1d1d1f; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    transition: all .2s; 
+    z-index: 20;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .detail-close:hover { 
+    background: #fff; 
+    transform: scale(1.05); 
+  }
+  .detail-close svg {
+    width: 20px;
+    height: 20px;
+  }
+
   .detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }
   .detail-title { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; margin-bottom: 0; }
   
@@ -991,33 +1077,66 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .custom-option.active { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
   
   @media (max-width: 768px) {
-    .grid { grid-template-columns: 1fr 1fr; gap: 16px; }
-    .card-body { padding: 16px; }
-    .card-title { font-size: 16px; }
-    .price { font-size: 20px; }
+    body { -webkit-tap-highlight-color: transparent; }
+    input, textarea, select { font-size: 16px !important; } /* Убирает автозум на iPhone */
+    
+    .grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card { border-radius: 16px; }
+    .card-body { padding: 12px; gap: 4px; }
+    .card-title { font-size: 14px; line-height: 1.3; }
+    .card-meta { font-size: 12px; }
+    .price { font-size: 18px; }
+    .price-old { font-size: 12px; }
     .btn { padding: 10px 14px; font-size: 13px; }
+    
+    /* Прячем лишнее на мобилках, чтобы не рябило в глазах */
+    .trust-badges { display: none; } 
+    
     .detail-content { padding: 20px; }
-    .detail-img-container { min-height: 300px; }
+    .detail-img-container { min-height: 320px; }
     .detail-title { font-size: 24px; }
+    .detail-bottom { flex-direction: column; align-items: stretch; gap: 16px; }
+    .detail-actions { width: 100%; }
+    .detail-actions .btn { width: 100%; padding: 16px; font-size: 16px; border-radius: 12px; }
+    
     .footer-grid { grid-template-columns: 1fr; gap: 32px; }
     .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
-    .recent-card, .favorite-card { min-width: 180px; max-width: 180px; }
+    
+    /* Горизонтальный скролл для фильтров (чтобы не переносились криво) */
+    .filters { 
+      flex-wrap: nowrap; 
+      overflow-x: auto; 
+      justify-content: flex-start; 
+      padding-bottom: 8px;
+      margin-left: -20px;
+      margin-right: -20px;
+      padding-left: 20px;
+      padding-right: 20px;
+      scrollbar-width: none; 
+      -webkit-overflow-scrolling: touch;
+    }
+    .filters::-webkit-scrollbar { display: none; } 
+    .filter { flex-shrink: 0; }
+    
+    /* Улучшаем блок недавно просмотренных */
+    .recent-card, .favorite-card { min-width: 200px; max-width: 200px; }
+    .recent-card .card-img, .favorite-card .card-img { aspect-ratio: 1; }
+    .recent-card .card-body, .favorite-card .card-body { padding: 12px; }
     .recent-card .card-title, .favorite-card .card-title { font-size: 14px; }
     .recent-card .price, .favorite-card .price { font-size: 16px; }
+    
     .logo img { height: 32px; }
     .logo { font-size: 18px; gap: 8px; }
-    .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
+    
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
+    
     .detail-header { flex-direction: column; gap: 12px; }
     .detail-meta-row { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .detail-bottom { flex-direction: column; align-items: flex-start; }
-    .detail-actions { max-width: 100%; }
-    .hit-badge { top: 10px; left: 10px; padding: 4px 8px; font-size: 10px; }
-    .status { top: 10px; right: 10px; padding: 4px 8px; font-size: 11px; }
-    .card.sold .hit-badge { display: none; }
+    .hit-badge { top: 10px; left: 10px; padding: 4px 8px; font-size: 10px; border-radius: 6px; }
+    .status { top: 10px; right: 10px; padding: 4px 8px; font-size: 11px; border-radius: 6px; }
     .recent-grid, .favorites-grid { scroll-snap-type: none; }
-    .skeleton-body { padding: 16px; }
+    .skeleton-body { padding: 12px; }
   }
 </style>
 </head>
@@ -1149,7 +1268,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
 <div class="modal-overlay" id="detail-modal" onclick="if(event.target===this) closeDetail()">
   <div class="modal detail-modal">
-    <button class="detail-close" onclick="closeDetail()">×</button>
+    <button class="detail-close" onclick="closeDetail()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
     <div class="detail-img-container">
       <div class="detail-main-img" id="detail-main-img-box"></div>
       <div class="detail-thumbnails" id="detail-thumbs-box"></div>
@@ -1217,6 +1338,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
 <!-- Модальное окно для Zoom -->
 <div class="zoom-overlay" id="zoom-overlay" onclick="closeZoom()">
+  <button class="zoom-close" onclick="closeZoom()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+  </button>
   <img src="" class="zoom-img" id="zoom-img" alt="Zoomed">
 </div>
 
@@ -1314,6 +1438,21 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
 <script>
 (function() {
+  // Логика скрытия хедера при скролле вниз
+  let lastScrollY = window.scrollY;
+  const headerEl = document.querySelector('header');
+  
+  window.addEventListener('scroll', function() {
+    if (window.scrollY > lastScrollY && window.scrollY > 60) {
+      // Скроллим вниз
+      headerEl.classList.add('header-hidden');
+    } else {
+      // Скроллим вверх или мы в самом верху
+      headerEl.classList.remove('header-hidden');
+    }
+    lastScrollY = window.scrollY;
+  }, { passive: true });
+
   var STATUS_LABEL = { available:'В наличии', reserved:'Забронировано', sold:'Продано' };
   var STATUS_BTN   = { available:'Забронировать', reserved:'Узнать', sold:'Уведомить' };
   var allPhones = [];
@@ -1474,7 +1613,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   enableWheelScroll('recent-grid');
   enableWheelScroll('favorites-grid');
 
-  // Функция для отрисовки скелетонов
   function renderSkeletons() {
     var html = '';
     for (var i = 0; i < 6; i++) {
@@ -1491,7 +1629,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   }
 
   function load() {
-    // Показываем скелетоны перед загрузкой
     renderSkeletons();
 
     fetch('/api/phones').then(function(r) { return r.json(); }).then(function(data) {
@@ -1735,7 +1872,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   document.getElementById('recent-grid').addEventListener('click', handleCardClick);
   document.getElementById('favorites-grid').addEventListener('click', handleCardClick);
 
-  // Функция для открытия зума
   window.openZoom = function(src) {
     var overlay = document.getElementById('zoom-overlay');
     var img = document.getElementById('zoom-img');
@@ -2610,8 +2746,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
               <option value="Розовый"></option>
             </datalist>
           </div>
-          
-          <div class="full" style="background: #fbfbfd; padding: 24px; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 8px;">
+<div class="full" style="background: #fbfbfd; padding: 24px; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 8px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
               <div>
                 <label>Обычная цена (₽) *</label>
