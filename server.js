@@ -36,7 +36,7 @@ function generateSlug(text) {
     .replace(/-+$/, '');
 }
 
-// ---------- ОБРАБОТКА ФОТО (ТОЛЬКО СЖАТИЕ, БЕЗ ВОДЯНЫХ ЗНАКОВ) ----------
+// ---------- ОБРАБОТКА ФОТО (ТОЛЬКО СЖАТИЕ) ----------
 async function processImages(images) {
   if (!Array.isArray(images)) return [];
   const processed = [];
@@ -746,9 +746,20 @@ const indexHTML = String.raw`<!DOCTYPE html>
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100vh; }
   .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; width: 100%; }
   
-  header { background: rgba(251, 251, 253, 0.8); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+  /* ИСПРАВЛЕНО: Добавлен webkit-backdrop-filter для iOS и z-index */
+  header { 
+    background: rgba(251, 251, 253, 0.85); 
+    -webkit-backdrop-filter: blur(20px); 
+    backdrop-filter: blur(20px); 
+    border-bottom: 1px solid var(--border); 
+    position: sticky; 
+    top: 0; 
+    z-index: 50; 
+  }
   .header-inner { display: flex; align-items: center; justify-content: center; height: 72px; }
-  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; cursor: default; display: flex; align-items: center; gap: 12px; }
+  
+  /* ИСПРАВЛЕНО: Запрет переноса строк для логотипа */
+  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; cursor: default; display: flex; align-items: center; gap: 12px; white-space: nowrap; }
   .logo img { height: 42px; width: auto; object-fit: contain; }
 
   .hero { text-align: center; padding: 80px 0 48px; background: radial-gradient(circle at 50% 0%, #ffffff 0%, #fbfbfd 100%); }
@@ -818,8 +829,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
   .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
   
-  /* ИСПРАВЛЕНО: proximity вместо mandatory для плавной прокрутки */
-  .recent-grid, .favorites-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scroll-snap-type: x proximity; scroll-behavior: smooth; }
+  .recent-grid, .favorites-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scroll-snap-type: x proximity; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
   
   .recent-grid::-webkit-scrollbar, .favorites-grid::-webkit-scrollbar { height: 6px; }
   .recent-card, .favorite-card { min-width: 240px; max-width: 240px; scroll-snap-align: start; }
@@ -835,7 +845,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-card .trust-badges, .favorite-card .trust-badges { display: none; }
   .recent-card .timer-label, .favorite-card .timer-label { display: none; }
 
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 100; opacity: 0; transition: opacity .3s ease; }
+  /* ИСПРАВЛЕНО: z-index модального окна увеличен, чтобы перекрыть шапку */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; opacity: 0; transition: opacity .3s ease; }
   .modal-overlay.open { display: flex; opacity: 1; }
   .modal { background: #fff; border-radius: 32px; width: 100%; animation: pop .4s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden; }
   @keyframes pop { from { transform: scale(0.95) translateY(20px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
@@ -943,21 +954,27 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .custom-option:hover { background: #f5f5f7; }
   .custom-option.active { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
   
+  /* ИСПРАВЛЕНО: Мобильная версия */
   @media (max-width: 768px) {
     .grid { grid-template-columns: 1fr 1fr; gap: 16px; }
     .card-body { padding: 16px; }
     .card-title { font-size: 16px; }
     .price { font-size: 20px; }
     .btn { padding: 10px 14px; font-size: 13px; }
-    .detail-content { padding: 24px; }
+    
+    .detail-content { padding: 20px; }
     .detail-img-container { min-height: 300px; }
+    .detail-title { font-size: 24px; } /* Уменьшили заголовок в модалке */
+    
     .footer-grid { grid-template-columns: 1fr; gap: 32px; }
     .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
     .recent-card, .favorite-card { min-width: 180px; max-width: 180px; }
     .recent-card .card-title, .favorite-card .card-title { font-size: 14px; }
     .recent-card .price, .favorite-card .price { font-size: 16px; }
+    
     .logo img { height: 32px; }
-    .logo span { font-size: 18px; }
+    .logo { font-size: 18px; gap: 8px; } /* Уменьшили логотип */
+    
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
@@ -965,6 +982,13 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .detail-meta-row { flex-direction: column; align-items: flex-start; gap: 12px; }
     .detail-bottom { flex-direction: column; align-items: flex-start; }
     .detail-actions { max-width: 100%; }
+    
+    /* Убираем наложение плашек на карточках */
+    .hit-badge { top: 10px; left: 10px; padding: 4px 8px; font-size: 10px; }
+    .status { top: 10px; right: 10px; padding: 4px 8px; font-size: 11px; }
+    .card.sold .hit-badge { display: none; } /* Если продан, то хит не нужен */
+    
+    .recent-grid, .favorites-grid { scroll-snap-type: none; } /* Убираем прилипание на мобилках для плавности */
   }
 </style>
 </head>
@@ -1590,7 +1614,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     try { recent = JSON.parse(localStorage.getItem('recently_viewed') || '[]'); } catch(e) {}
     recent = recent.filter(function(x) { return x !== id; });
     recent.unshift(id);
-    if (recent.length > 20) recent.pop(); // Увеличили лимит до 20
+    if (recent.length > 20) recent.pop();
     localStorage.setItem('recently_viewed', JSON.stringify(recent));
   }
 
