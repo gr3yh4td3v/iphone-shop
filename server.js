@@ -71,6 +71,7 @@ function readDB() {
     if (!Array.isArray(data.phones)) data.phones = [];
     if (!Array.isArray(data.reviews)) data.reviews = [];
     if (!Array.isArray(data.tokens)) data.tokens = [];
+    if (!Array.isArray(data.notifications)) data.notifications = []; // Для заявок на уведомление
     if (!data.nextId) data.nextId = data.phones.reduce((m, p) => Math.max(m, p.id || 0), 0) + 1;
     if (!data.nextReviewId) data.nextReviewId = data.reviews.reduce((m, r) => Math.max(m, r.id || 0), 0) + 1;
 
@@ -87,7 +88,7 @@ function readDB() {
 
     return data;
   } catch {
-    return { phones: [], reviews: [], tokens: [], nextId: 1, nextReviewId: 1 };
+    return { phones: [], reviews: [], tokens: [], notifications: [], nextId: 1, nextReviewId: 1 };
   }
 }
 function writeDB(data) {
@@ -466,7 +467,7 @@ app.post('/api/phone/:id/view', (req, res) => {
   res.json({ ok: true });
 });
 
-// ЗАЯВКА С ГЕНЕРАЦИЕЙ ТОКЕНА ДЛЯ ОТЗЫВА
+// ЗАЯВКА С ГЕНЕРАЦИЕЙ ТОКЕНА ДЛЯ ОТЗЫВА И СОХРАНЕНИЕМ УВЕДОМЛЕНИЙ
 app.post('/api/order', async (req, res) => {
   const { phone_id, name, contact, message, type } = req.body || {};
   if (!name || !contact) return res.status(400).json({ ok: false, error: 'Заполните имя и контакт' });
@@ -485,6 +486,19 @@ app.post('/api/order', async (req, res) => {
 
   const reviewToken = crypto.randomBytes(16).toString('hex');
   db.tokens.push({ token: reviewToken, used: false, created_at: Date.now() });
+
+  // Сохраняем уведомление в базу, если это запрос на поступление
+  if (type === 'notify' && phone) {
+    db.notifications.push({
+      id: Date.now(),
+      phone_id: phone.id,
+      phone_name: `${phone.brand} ${phone.model} (${phone.storage})`,
+      name: name,
+      contact: finalContact,
+      date: new Date().toISOString()
+    });
+  }
+
   writeDB(db);
 
   const phoneLine = phone
@@ -509,7 +523,7 @@ app.post('/api/order', async (req, res) => {
     `📞 <b>Контакт:</b> ${esc(finalContact)}\n` +
     `📝 <b>Комментарий:</b> ${esc(message) || '—'}\n\n` +
     `🕒 ${new Date().toLocaleString('ru-RU')}\n\n` +
-    `🔗 <b>Ссылка для отзыва (отправь клиенту после продажи):</b>\n${reviewLink}`
+    (type !== 'notify' ? `🔗 <b>Ссылка для отзыва (отправь клиенту после продажи):</b>\n${reviewLink}` : '')
   );
 
   if (err) return res.status(500).json({ ok: false, error: err });
@@ -521,6 +535,18 @@ app.post('/api/order', async (req, res) => {
 // ============================================================
 app.get('/api/admin/phones', auth, (req, res) => {
   res.json(readDB().phones);
+});
+
+app.get('/api/admin/notifications', auth, (req, res) => {
+  res.json(readDB().notifications.reverse());
+});
+
+app.delete('/api/admin/notifications/:id', auth, (req, res) => {
+  const id = Number(req.params.id);
+  const db = readDB();
+  db.notifications = db.notifications.filter(n => n.id !== id);
+  writeDB(db);
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/login', (req, res) => {
@@ -746,19 +772,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100vh; }
   .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; width: 100%; }
   
-  /* ИСПРАВЛЕНО: Добавлен webkit-backdrop-filter для iOS и z-index */
-  header { 
-    background: rgba(251, 251, 253, 0.85); 
-    -webkit-backdrop-filter: blur(20px); 
-    backdrop-filter: blur(20px); 
-    border-bottom: 1px solid var(--border); 
-    position: sticky; 
-    top: 0; 
-    z-index: 50; 
-  }
+  header { background: rgba(251, 251, 253, 0.85); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
   .header-inner { display: flex; align-items: center; justify-content: center; height: 72px; }
-  
-  /* ИСПРАВЛЕНО: Запрет переноса строк для логотипа */
   .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; cursor: default; display: flex; align-items: center; gap: 12px; white-space: nowrap; }
   .logo img { height: 42px; width: auto; object-fit: contain; }
 
@@ -845,7 +860,27 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-card .trust-badges, .favorite-card .trust-badges { display: none; }
   .recent-card .timer-label, .favorite-card .timer-label { display: none; }
 
-  /* ИСПРАВЛЕНО: z-index модального окна увеличен, чтобы перекрыть шапку */
+  /* SKELETON LOADING */
+  @keyframes pulse {
+    0% { background-color: #f2f2f7; }
+    50% { background-color: #e5e5ea; }
+    100% { background-color: #f2f2f7; }
+  }
+  .skeleton-card {
+    background: var(--card); border-radius: 24px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column;
+  }
+  .skeleton-img { aspect-ratio: 4/5; animation: pulse 1.5s infinite ease-in-out; }
+  .skeleton-body { padding: 28px; display: flex; flex-direction: column; gap: 12px; }
+  .skeleton-text { height: 20px; border-radius: 6px; animation: pulse 1.5s infinite ease-in-out; }
+  .skeleton-text.title { width: 70%; height: 24px; }
+  .skeleton-text.meta { width: 50%; height: 16px; }
+  .skeleton-price { height: 30px; width: 40%; margin-top: 10px; border-radius: 6px; animation: pulse 1.5s infinite ease-in-out; }
+
+  /* ZOOM IMAGE */
+  .zoom-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; z-index: 2000; opacity: 0; transition: opacity .3s ease; cursor: zoom-out; }
+  .zoom-overlay.open { display: flex; opacity: 1; }
+  .zoom-img { max-width: 95vw; max-height: 95vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; opacity: 0; transition: opacity .3s ease; }
   .modal-overlay.open { display: flex; opacity: 1; }
   .modal { background: #fff; border-radius: 32px; width: 100%; animation: pop .4s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden; }
@@ -853,8 +888,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .detail-modal { max-width: 1000px; display: flex; flex-direction: column; max-height: 90vh; }
   @media(min-width: 768px) { .detail-modal { flex-direction: row; } }
   .detail-img-container { flex: 1.2; background: #f5f5f7; display: flex; flex-direction: column; min-height: 400px; }
-  .detail-main-img { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-  .detail-main-img img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+  .detail-main-img { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; cursor: zoom-in; }
+  .detail-main-img img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; transition: transform .3s ease; }
+  .detail-main-img:hover img { transform: scale(1.02); }
   .detail-main-img svg { width: 120px; height: 120px; color: var(--border); }
   .detail-thumbnails { display: flex; gap: 10px; padding: 16px; overflow-x: auto; background: #fff; border-top: 1px solid var(--border); }
   .detail-thumb { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 2px solid transparent; transition: border-color .2s; }
@@ -954,27 +990,22 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .custom-option:hover { background: #f5f5f7; }
   .custom-option.active { color: var(--accent); font-weight: 600; background: rgba(0,113,227,0.05); }
   
-  /* ИСПРАВЛЕНО: Мобильная версия */
   @media (max-width: 768px) {
     .grid { grid-template-columns: 1fr 1fr; gap: 16px; }
     .card-body { padding: 16px; }
     .card-title { font-size: 16px; }
     .price { font-size: 20px; }
     .btn { padding: 10px 14px; font-size: 13px; }
-    
     .detail-content { padding: 20px; }
     .detail-img-container { min-height: 300px; }
-    .detail-title { font-size: 24px; } /* Уменьшили заголовок в модалке */
-    
+    .detail-title { font-size: 24px; }
     .footer-grid { grid-template-columns: 1fr; gap: 32px; }
     .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
     .recent-card, .favorite-card { min-width: 180px; max-width: 180px; }
     .recent-card .card-title, .favorite-card .card-title { font-size: 14px; }
     .recent-card .price, .favorite-card .price { font-size: 16px; }
-    
     .logo img { height: 32px; }
-    .logo { font-size: 18px; gap: 8px; } /* Уменьшили логотип */
-    
+    .logo { font-size: 18px; gap: 8px; }
     .reviews-header { flex-direction: column; align-items: flex-start; gap: 16px; }
     .controls-row { flex-direction: column; align-items: stretch; }
     .custom-select { min-width: 100%; }
@@ -982,13 +1013,11 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .detail-meta-row { flex-direction: column; align-items: flex-start; gap: 12px; }
     .detail-bottom { flex-direction: column; align-items: flex-start; }
     .detail-actions { max-width: 100%; }
-    
-    /* Убираем наложение плашек на карточках */
     .hit-badge { top: 10px; left: 10px; padding: 4px 8px; font-size: 10px; }
     .status { top: 10px; right: 10px; padding: 4px 8px; font-size: 11px; }
-    .card.sold .hit-badge { display: none; } /* Если продан, то хит не нужен */
-    
-    .recent-grid, .favorites-grid { scroll-snap-type: none; } /* Убираем прилипание на мобилках для плавности */
+    .card.sold .hit-badge { display: none; }
+    .recent-grid, .favorites-grid { scroll-snap-type: none; }
+    .skeleton-body { padding: 16px; }
   }
 </style>
 </head>
@@ -1184,6 +1213,11 @@ const indexHTML = String.raw`<!DOCTYPE html>
       </div>
     </div>
   </div>
+</div>
+
+<!-- Модальное окно для Zoom -->
+<div class="zoom-overlay" id="zoom-overlay" onclick="closeZoom()">
+  <img src="" class="zoom-img" id="zoom-img" alt="Zoomed">
 </div>
 
 <div class="modal-overlay" id="order-modal" onclick="if(event.target===this) closeOrder()">
@@ -1440,7 +1474,26 @@ const indexHTML = String.raw`<!DOCTYPE html>
   enableWheelScroll('recent-grid');
   enableWheelScroll('favorites-grid');
 
+  // Функция для отрисовки скелетонов
+  function renderSkeletons() {
+    var html = '';
+    for (var i = 0; i < 6; i++) {
+      html += '<div class="skeleton-card">' +
+        '<div class="skeleton-img"></div>' +
+        '<div class="skeleton-body">' +
+          '<div class="skeleton-text title"></div>' +
+          '<div class="skeleton-text meta"></div>' +
+          '<div class="skeleton-price"></div>' +
+        '</div>' +
+      '</div>';
+    }
+    grid.innerHTML = html;
+  }
+
   function load() {
+    // Показываем скелетоны перед загрузкой
+    renderSkeletons();
+
     fetch('/api/phones').then(function(r) { return r.json(); }).then(function(data) {
       allPhones = data; 
       render(); 
@@ -1506,7 +1559,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
 
   function buildCardHtml(p, cardType) {
     var mainImg = p.images && p.images.length > 0 ? p.images[0] : '';
-    var img = mainImg ? '<img src="' + mainImg + '" alt="' + esc(p.brand) + ' ' + esc(p.model) + '">' : phoneSvg;
+    var img = mainImg ? '<img src="' + mainImg + '" alt="' + esc(p.brand) + ' ' + esc(p.model) + '" loading="lazy">' : phoneSvg;
     var meta = [p.storage, p.color].filter(Boolean).join(' · ');
     
     var now = new Date().getTime();
@@ -1682,6 +1735,18 @@ const indexHTML = String.raw`<!DOCTYPE html>
   document.getElementById('recent-grid').addEventListener('click', handleCardClick);
   document.getElementById('favorites-grid').addEventListener('click', handleCardClick);
 
+  // Функция для открытия зума
+  window.openZoom = function(src) {
+    var overlay = document.getElementById('zoom-overlay');
+    var img = document.getElementById('zoom-img');
+    img.src = src;
+    overlay.classList.add('open');
+  };
+
+  window.closeZoom = function() {
+    document.getElementById('zoom-overlay').classList.remove('open');
+  };
+
   function openDetail(id) {
     var p = allPhones.find(function(x) { return x.id === id; });
     if (!p) return;
@@ -1697,7 +1762,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var thumbsBox = document.getElementById('detail-thumbs-box');
     
     if (p.images && p.images.length > 0) {
-      mainBox.innerHTML = '<img src="' + p.images[0] + '" id="main-gallery-img">';
+      mainBox.innerHTML = '<img src="' + p.images[0] + '" id="main-gallery-img" onclick="openZoom(this.src)">';
       if (p.images.length > 1) {
         var thumbsHtml = '';
         for (var i = 0; i < p.images.length; i++) {
@@ -1771,7 +1836,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   window.changeMainImg = function(el, index) {
     var p = allPhones.find(function(x) { return x.id === currentDetailId; });
     if (!p || !p.images) return;
-    document.getElementById('main-gallery-img').src = p.images[index];
+    var img = document.getElementById('main-gallery-img');
+    img.src = p.images[index];
     document.querySelectorAll('.detail-thumb').forEach(function(t) { t.classList.remove('active'); });
     el.classList.add('active');
   };
@@ -2204,11 +2270,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
   .preview-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
   .preview-img-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-  .phone-list, .review-list { display:flex; flex-direction:column; gap:16px; }
-  .phone-row, .review-row { background:#fff; border-radius:20px; padding:20px 24px; border:1px solid var(--border); display:grid; gap:24px; align-items:center; transition:box-shadow .2s; }
+  .phone-list, .review-list, .notification-list { display:flex; flex-direction:column; gap:16px; }
+  .phone-row, .review-row, .notification-row { background:#fff; border-radius:20px; padding:20px 24px; border:1px solid var(--border); display:grid; gap:24px; align-items:center; transition:box-shadow .2s; }
   .phone-row { grid-template-columns:70px 1fr auto auto; }
   .review-row { grid-template-columns: 1fr auto; }
-  .phone-row:hover, .review-row:hover { box-shadow:0 10px 30px rgba(0,0,0,0.05); }
+  .notification-row { grid-template-columns: 1fr auto; border-left: 4px solid var(--red); }
+  .phone-row:hover, .review-row:hover, .notification-row:hover { box-shadow:0 10px 30px rgba(0,0,0,0.05); }
   .phone-thumb { width:70px; height:70px; border-radius:16px; background:#fafafa; display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--border); }
   .phone-thumb img { width:100%; height:100%; object-fit:cover; }
   .phone-thumb svg { width:28px; height:28px; color:var(--border); }
@@ -2431,7 +2498,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     .dashboard { flex-direction: column; }
     .form-grid { grid-template-columns:1fr; }
     .discount-fields { grid-template-columns: 1fr; }
-    .phone-row { grid-template-columns:60px 1fr; gap:16px; padding:20px; }
+    .phone-row, .notification-row { grid-template-columns:1fr; gap:16px; padding:20px; }
     .phone-price, .phone-actions { grid-column:1 / -1; }
     .phone-actions { justify-content:flex-end; flex-wrap: wrap; }
     .review-row { grid-template-columns: 1fr; }
@@ -2506,6 +2573,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
     <div class="tabs">
       <button class="tab active" onclick="switchTab('phones')">Товары</button>
       <button class="tab" onclick="switchTab('reviews')">Отзывы</button>
+      <button class="tab" onclick="switchTab('notifications')">Уведомления</button>
     </div>
 
     <div id="tab-phones" class="tab-content active">
@@ -2656,6 +2724,10 @@ const adminHTML = String.raw`<!DOCTYPE html>
       <div class="review-list" id="review-list"></div>
     </div>
 
+    <div id="tab-notifications" class="tab-content">
+      <div class="notification-list" id="notification-list"></div>
+    </div>
+
   </main>
 </div>
 
@@ -2692,6 +2764,7 @@ const adminHTML = String.raw`<!DOCTYPE html>
   
   var phones = [];
   var reviews = [];
+  var notifications = [];
   var editingId = null;
   var phoneSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>';
 
@@ -2700,11 +2773,15 @@ const adminHTML = String.raw`<!DOCTYPE html>
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     
     document.querySelectorAll('.tab').forEach(t => {
-      if(t.textContent.toLowerCase() === (tab === 'phones' ? 'товары' : 'отзывы')) t.classList.add('active');
+      var text = t.textContent.toLowerCase();
+      if (tab === 'phones' && text === 'товары') t.classList.add('active');
+      if (tab === 'reviews' && text === 'отзывы') t.classList.add('active');
+      if (tab === 'notifications' && text === 'уведомления') t.classList.add('active');
     });
     
     $('tab-' + tab).classList.add('active');
     if (tab === 'reviews') loadReviews();
+    if (tab === 'notifications') loadNotifications();
   };
 
   window.toggleDiscount = function() {
@@ -2842,6 +2919,12 @@ const adminHTML = String.raw`<!DOCTYPE html>
     reviews = await r.json();
     renderReviews();
   }
+
+  async function loadNotifications() {
+    var r = await api('/api/admin/notifications');
+    notifications = await r.json();
+    renderNotifications();
+  }
   
   function renderList() {
     var list = $('phone-list');
@@ -2933,6 +3016,46 @@ const adminHTML = String.raw`<!DOCTYPE html>
     }
     list.innerHTML = html;
   }
+
+  function renderNotifications() {
+    var list = $('notification-list');
+    if (notifications.length === 0) {
+      list.innerHTML = '<div class="empty">Нет активных запросов на уведомление</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < notifications.length; i++) {
+      var n = notifications[i];
+      var date = new Date(n.date).toLocaleString('ru-RU');
+      
+      var contactHtml = '';
+      if (n.contact.startsWith('@')) {
+        var tgUsername = n.contact.replace('@', '');
+        contactHtml = '<a href="https://t.me/' + tgUsername + '" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none; margin-right:8px;">Написать в TG</a>';
+      } else {
+        contactHtml = '<button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(\'' + n.contact + '\')" style="margin-right:8px;">Скопировать номер</button>';
+      }
+
+      html += '<div class="notification-row">' +
+        '<div class="phone-info">' +
+          '<div class="phone-name">' + esc(n.phone_name) + '</div>' +
+          '<div class="phone-meta">Клиент: <b>' + esc(n.name) + '</b> | Контакт: <b>' + esc(n.contact) + '</b></div>' +
+          '<div class="phone-stats">' + date + '</div>' +
+        '</div>' +
+        '<div class="phone-actions">' +
+          contactHtml +
+          '<button class="btn btn-danger btn-sm" onclick="deleteNotification(' + n.id + ')">Обработано</button>' +
+        '</div>' +
+      '</div>';
+    }
+    list.innerHTML = html;
+  }
+
+  window.deleteNotification = async function(id) {
+    if (!confirm('Удалить этот запрос? (Сделайте это после того, как сообщили клиенту о поступлении)')) return;
+    await api('/api/admin/notifications/' + id, { method: 'DELETE' });
+    await loadNotifications();
+  };
 
   function initCustomSelects() {
     document.querySelectorAll('select:not(.customized)').forEach(select => {
