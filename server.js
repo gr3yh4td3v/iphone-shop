@@ -36,7 +36,7 @@ function generateSlug(text) {
     .replace(/-+$/, '');
 }
 
-// ---------- ОБРАБОТКА ФОТО (ТОЛЬКО СЖАТИЕ) ----------
+// ---------- ОБРАБОТКА ФОТО (ТОЛЬКО СЖАТИЕ В BASE64) ----------
 async function processImages(images) {
   if (!Array.isArray(images)) return [];
   const processed = [];
