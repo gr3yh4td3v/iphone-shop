@@ -1625,7 +1625,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
           }
           
           e.preventDefault();
-          // Умножаем на 1.5, чтобы прокручивалось быстрее и комфортнее (1 щелчок = 1.5 карточки)
+          // Умножаем на 1.2, чтобы прокручивалось быстрее и комфортнее
           el.scrollLeft += e.deltaY * 1.2; 
         }
       }, { passive: false });
@@ -3519,7 +3519,7 @@ app.get('/', (req, res) => {
 
 app.get('/:slug', (req, res, next) => {
   const slug = req.params.slug;
-
+  
   // Пропускаем системные пути
   if (slug === 'admin' || slug === 'admin.html' || slug === 'api') return next();
 
@@ -3535,7 +3535,7 @@ app.get('/:slug', (req, res, next) => {
     html = html.replace(/__TITLE__/g, title)
                .replace(/__DESC__/g, desc)
                .replace(/__IMAGE__/g, img);
-
+               
     res.type('html').send(html);
   } else {
     // Если slug не найден, отдаем 404 или главную
