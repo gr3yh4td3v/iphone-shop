@@ -40,22 +40,22 @@ function generateSlug(text) {
 async function processImages(images) {
   if (!Array.isArray(images)) return [];
   const processed = [];
-  
+
   for (let img of images) {
     if (img.startsWith('data:image')) {
       try {
         const base64Data = img.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, 'base64');
-        
+
         const resizedBuffer = await sharp(buffer)
           .resize({ width: 1200, withoutEnlargement: true })
           .jpeg({ quality: 85 })
           .toBuffer();
-          
+
         processed.push(`data:image/jpeg;base64,${resizedBuffer.toString('base64')}`);
       } catch (e) {
         console.error('❌ Ошибка обработки изображения:', e.message);
-        processed.push(img); 
+        processed.push(img);
       }
     } else {
       processed.push(img);
@@ -419,12 +419,12 @@ app.get('/api/reviews', (req, res) => {
 // ОТЗЫВЫ С ТОКЕНАМИ
 app.post('/api/review', async (req, res) => {
   const { name, text, rating, phone_model, token } = req.body || {};
-  
+
   if (!name || !text) return res.status(400).json({ ok: false, error: 'Заполните имя и текст' });
   if (!token) return res.status(403).json({ ok: false, error: 'Оставить отзыв могут только покупатели. Ссылка на отзыв приходит после покупки.' });
 
   const db = readDB();
-  
+
   const tokenIndex = db.tokens.findIndex(t => t.token === token && t.used === false);
   if (tokenIndex === -1) {
     return res.status(403).json({ ok: false, error: 'Недействительная или уже использованная ссылка на отзыв.' });
@@ -513,7 +513,7 @@ app.post('/api/order', async (req, res) => {
     extraLine = '\n<i>(Клиент ждет поступления этого товара)</i>';
   }
 
-  const siteUrl = 'https://iphone-shop.up.railway.app'; 
+  const siteUrl = 'https://iphone-shop.up.railway.app';
   const reviewLink = `${siteUrl}/?review=${reviewToken}`;
 
   const err = await notify(
@@ -623,7 +623,7 @@ app.post('/api/admin/phones', auth, async (req, res) => {
   let processedImages = await processImages(images);
 
   const db = readDB();
-  
+
   let baseSlug = generateSlug(`${brand} ${model} ${storage}`);
   let slug = baseSlug;
   let counter = 1;
@@ -676,7 +676,7 @@ app.put('/api/admin/phones/:id', auth, async (req, res) => {
   if (idx === -1) return res.status(404).json({ ok: false, error: 'Не найдено' });
 
   const prev = db.phones[idx];
-  
+
   let processedImages = req.body.images ? await processImages(req.body.images) : prev.images;
 
   const updated = { ...prev, ...req.body, id, price: Number(req.body.price || prev.price), images: processedImages };
@@ -877,19 +877,19 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
   .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
   
-  /* Исходный плавный скролл (как в самом начале) */
   .recent-grid, .favorites-grid { 
     display: flex; 
     gap: 20px; 
     overflow-x: auto; 
     padding-bottom: 20px; 
-    scroll-snap-type: x proximity; 
-    scroll-behavior: smooth; 
+    scroll-snap-type: x mandatory; /* Карточки будут четко прилипать */
+    /* Убрали scroll-behavior: smooth, так как он конфликтует с колесиком мыши */
     -webkit-overflow-scrolling: touch; 
+    scrollbar-width: none; /* Убираем полосу скролла (в Firefox) */
   }
   
   .recent-grid::-webkit-scrollbar, .favorites-grid::-webkit-scrollbar { 
-    height: 6px; 
+    display: none; /* Убираем полосу скролла (в Chrome/Safari) */
   }
   
   .recent-card, .favorite-card { 
@@ -1617,8 +1617,16 @@ const indexHTML = String.raw`<!DOCTYPE html>
     if (el) {
       el.addEventListener('wheel', function(e) {
         if (e.deltaY !== 0) {
+          var maxScroll = el.scrollWidth - el.clientWidth;
+          
+          // Если докрутили до самого края, отпускаем скролл страницы (чтобы не залипало)
+          if ((el.scrollLeft >= maxScroll - 1 && e.deltaY > 0) || (el.scrollLeft <= 0 && e.deltaY < 0)) {
+            return; 
+          }
+          
           e.preventDefault();
-          this.scrollLeft += e.deltaY;
+          // Умножаем на 1.5, чтобы прокручивалось быстрее и комфортнее (1 щелчок = 1.5 карточки)
+          el.scrollLeft += e.deltaY * 1.5; 
         }
       }, { passive: false });
     }
@@ -3511,7 +3519,7 @@ app.get('/', (req, res) => {
 
 app.get('/:slug', (req, res, next) => {
   const slug = req.params.slug;
-  
+
   // Пропускаем системные пути
   if (slug === 'admin' || slug === 'admin.html' || slug === 'api') return next();
 
@@ -3527,7 +3535,7 @@ app.get('/:slug', (req, res, next) => {
     html = html.replace(/__TITLE__/g, title)
                .replace(/__DESC__/g, desc)
                .replace(/__IMAGE__/g, img);
-               
+
     res.type('html').send(html);
   } else {
     // Если slug не найден, отдаем 404 или главную
