@@ -1626,7 +1626,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
           
           e.preventDefault();
           // Умножаем на 1.5, чтобы прокручивалось быстрее и комфортнее (1 щелчок = 1.5 карточки)
-          el.scrollLeft += e.deltaY * 1.5; 
+          el.scrollLeft += e.deltaY * 1.2; 
         }
       }, { passive: false });
     }
