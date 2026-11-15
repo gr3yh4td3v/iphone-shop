@@ -752,7 +752,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>__TITLE__</title>
 <meta name="description" content="__DESC__">
 <meta property="og:title" content="__TITLE__">
@@ -772,7 +772,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100vh; }
   .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; width: 100%; }
   
-  /* Плавное скрытие шапки */
+  /* Плавное скрытие шапки с учетом челки iPhone */
   header { 
     background: rgba(251, 251, 253, 0.85); 
     -webkit-backdrop-filter: blur(20px); 
@@ -781,8 +781,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
     position: sticky; 
     top: 0; 
     z-index: 50; 
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); 
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
     will-change: transform;
+    padding-top: env(safe-area-inset-top);
   }
   header.header-hidden { 
     transform: translateY(-100%); 
@@ -883,7 +884,6 @@ const indexHTML = String.raw`<!DOCTYPE html>
   
   .recent-grid::-webkit-scrollbar, .favorites-grid::-webkit-scrollbar { height: 6px; }
   .recent-card, .favorite-card { min-width: 240px; max-width: 240px; scroll-snap-align: start; }
-  .recent-card .card-img, .favorite-card .card-img { aspect-ratio: 1; }
   .recent-card .card-body, .favorite-card .card-body { padding: 16px; }
   .recent-card .card-title, .favorite-card .card-title { font-size: 16px; }
   .recent-card .price, .favorite-card .price { font-size: 20px; }
@@ -1102,7 +1102,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .footer-grid { grid-template-columns: 1fr; gap: 32px; }
     .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
     
-    /* Горизонтальный скролл для фильтров (чтобы не переносились криво) */
+    /* Горизонтальный скролл для фильтров */
     .filters { 
       flex-wrap: nowrap; 
       overflow-x: auto; 
@@ -1118,12 +1118,12 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .filters::-webkit-scrollbar { display: none; } 
     .filter { flex-shrink: 0; }
     
-    /* Улучшаем блок недавно просмотренных */
-    .recent-card, .favorite-card { min-width: 200px; max-width: 200px; }
-    .recent-card .card-img, .favorite-card .card-img { aspect-ratio: 1; }
+    /* Идеальные карточки в недавно просмотренных */
+    .recent-card, .favorite-card { min-width: 160px; max-width: 160px; }
     .recent-card .card-body, .favorite-card .card-body { padding: 12px; }
     .recent-card .card-title, .favorite-card .card-title { font-size: 14px; }
     .recent-card .price, .favorite-card .price { font-size: 16px; }
+    .recent-card .price-row, .favorite-card .price-row { flex-wrap: wrap; gap: 4px; }
     
     .logo img { height: 32px; }
     .logo { font-size: 18px; gap: 8px; }
@@ -1442,16 +1442,20 @@ const indexHTML = String.raw`<!DOCTYPE html>
   let lastScrollY = window.scrollY;
   const headerEl = document.querySelector('header');
   
-  window.addEventListener('scroll', function() {
-    if (window.scrollY > lastScrollY && window.scrollY > 60) {
+  function handleScroll() {
+    const currentScrollY = window.scrollY;
+    if (currentScrollY > lastScrollY && currentScrollY > 20) {
       // Скроллим вниз
       headerEl.classList.add('header-hidden');
     } else {
       // Скроллим вверх или мы в самом верху
       headerEl.classList.remove('header-hidden');
     }
-    lastScrollY = window.scrollY;
-  }, { passive: true });
+    lastScrollY = currentScrollY;
+  }
+
+  window.addEventListener('scroll', handleScroll, { passive: true });
+  window.addEventListener('touchmove', handleScroll, { passive: true });
 
   var STATUS_LABEL = { available:'В наличии', reserved:'Забронировано', sold:'Продано' };
   var STATUS_BTN   = { available:'Забронировать', reserved:'Узнать', sold:'Уведомить' };
@@ -1603,9 +1607,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var el = document.getElementById(containerId);
     if (el) {
       el.addEventListener('wheel', function(e) {
-        if (e.deltaY !== 0) {
+        if (e.deltaY !== 0 || e.deltaX !== 0) {
           e.preventDefault();
-          this.scrollLeft += e.deltaY;
+          this.scrollLeft += (e.deltaY + e.deltaX);
         }
       }, { passive: false });
     }
