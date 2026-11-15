@@ -877,7 +877,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
   .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
   
-  /* Нативный горизонтальный скролл с аккуратным скроллбаром */
+  /* Нативный горизонтальный скролл */
   .recent-grid, .favorites-grid { 
     display: flex; 
     gap: 20px; 
@@ -1621,8 +1621,25 @@ const indexHTML = String.raw`<!DOCTYPE html>
     timersInterval = setInterval(updateTimers, 1000);
   }
 
-  // Нативный скролл на ПК через CSS, никаких костылей с перехватом колесика
-  // Удалена функция enableWheelScroll
+  // Прокрутка колесиком мыши для горизонтальных блоков
+  function enableWheelScroll(containerId) {
+    var el = document.getElementById(containerId);
+    if (el) {
+      el.addEventListener('wheel', function(e) {
+        if (e.deltaY !== 0) {
+          var maxScroll = el.scrollWidth - el.clientWidth;
+          // Если докрутили до края, даем странице скроллиться дальше
+          if ((el.scrollLeft === 0 && e.deltaY < 0) || (el.scrollLeft >= maxScroll && e.deltaY > 0)) {
+            return; 
+          }
+          e.preventDefault();
+          el.scrollLeft += e.deltaY;
+        }
+      }, { passive: false });
+    }
+  }
+  enableWheelScroll('recent-grid');
+  enableWheelScroll('favorites-grid');
 
   function renderSkeletons() {
     var html = '';
