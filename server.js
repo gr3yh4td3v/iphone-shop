@@ -772,11 +772,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; min-height: 100vh; }
   .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; width: 100%; }
   
-  /* Плавное скрытие шапки с учетом челки iPhone */
+  /* Сплошная белая шапка, чтобы ничего не просвечивало */
   header { 
-    background: rgba(251, 251, 253, 0.85); 
-    -webkit-backdrop-filter: blur(20px); 
-    backdrop-filter: blur(20px); 
+    background: #ffffff; 
     border-bottom: 1px solid var(--border); 
     position: sticky; 
     top: 0; 
@@ -815,12 +813,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .card-img { 
     aspect-ratio: 4/5; 
     width: 100%;
-    flex-shrink: 0;
     background: #f5f5f7; 
     position: relative; 
-    display: flex; 
-    align-items: center; 
-    justify-content: center; 
     overflow: hidden; 
   }
   .card-img img { 
@@ -833,7 +827,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     transition: transform .6s ease; 
   }
   .card:hover .card-img img { transform: scale(1.04); }
-  .card-img svg { width: 64px; height: 64px; color: var(--border); }
+  .card-img svg { width: 64px; height: 64px; color: var(--border); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
   
   .status { position: absolute; top: 16px; right: 16px; padding: 8px 16px; border-radius: 100px; font-size: 13px; font-weight: 700; z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: inline-flex; align-items: center; justify-content: center; }
   .status.available { background: rgba(255, 255, 255, 0.95); color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
@@ -880,10 +874,25 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
   .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
   
-  .recent-grid, .favorites-grid { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; scroll-snap-type: x proximity; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+  /* Идеальный горизонтальный скролл */
+  .recent-grid, .favorites-grid { 
+    display: flex; 
+    gap: 20px; 
+    overflow-x: auto; 
+    padding-bottom: 20px; 
+    scroll-snap-type: x proximity; 
+    scroll-behavior: smooth; 
+    -webkit-overflow-scrolling: touch;
+  }
   
   .recent-grid::-webkit-scrollbar, .favorites-grid::-webkit-scrollbar { height: 6px; }
-  .recent-card, .favorite-card { min-width: 240px; max-width: 240px; scroll-snap-align: start; }
+  .recent-card, .favorite-card { 
+    flex: 0 0 240px; /* Жесткая ширина, чтобы не сжимались */
+    scroll-snap-align: start; 
+  }
+  .recent-card .card-img, .favorite-card .card-img { 
+    aspect-ratio: 4/5; /* Возвращаем пропорции как на авито */
+  }
   .recent-card .card-body, .favorite-card .card-body { padding: 16px; }
   .recent-card .card-title, .favorite-card .card-title { font-size: 16px; }
   .recent-card .price, .favorite-card .price { font-size: 20px; }
@@ -1119,7 +1128,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .filter { flex-shrink: 0; }
     
     /* Идеальные карточки в недавно просмотренных */
-    .recent-card, .favorite-card { min-width: 160px; max-width: 160px; }
+    .recent-card, .favorite-card { flex: 0 0 160px; }
+    .recent-card .card-img, .favorite-card .card-img { aspect-ratio: 4/5; }
     .recent-card .card-body, .favorite-card .card-body { padding: 12px; }
     .recent-card .card-title, .favorite-card .card-title { font-size: 14px; }
     .recent-card .price, .favorite-card .price { font-size: 16px; }
@@ -1607,9 +1617,9 @@ const indexHTML = String.raw`<!DOCTYPE html>
     var el = document.getElementById(containerId);
     if (el) {
       el.addEventListener('wheel', function(e) {
-        if (e.deltaY !== 0 || e.deltaX !== 0) {
+        if (e.deltaY !== 0) {
           e.preventDefault();
-          this.scrollLeft += (e.deltaY + e.deltaX);
+          this.scrollLeft += e.deltaY;
         }
       }, { passive: false });
     }
