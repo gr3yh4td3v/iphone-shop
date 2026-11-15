@@ -877,33 +877,24 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
   .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
   
-  /* Нативный горизонтальный скролл (без smooth, чтобы колесико мыши не лагало) */
+  /* Исходный плавный скролл (как в самом начале) */
   .recent-grid, .favorites-grid { 
     display: flex; 
     gap: 20px; 
     overflow-x: auto; 
     padding-bottom: 20px; 
     scroll-snap-type: x proximity; 
-    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth; 
+    -webkit-overflow-scrolling: touch; 
   }
   
   .recent-grid::-webkit-scrollbar, .favorites-grid::-webkit-scrollbar { 
-    height: 8px; 
+    height: 6px; 
   }
-  .recent-grid::-webkit-scrollbar-track, .favorites-grid::-webkit-scrollbar-track {
-    background: #f1f1f1; 
-    border-radius: 4px;
-  }
-  .recent-grid::-webkit-scrollbar-thumb, .favorites-grid::-webkit-scrollbar-thumb {
-    background: #c1c1c1; 
-    border-radius: 4px;
-  }
-  .recent-grid::-webkit-scrollbar-thumb:hover, .favorites-grid::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-  }
-
+  
   .recent-card, .favorite-card { 
-    flex: 0 0 240px; 
+    min-width: 240px; 
+    max-width: 240px; 
     scroll-snap-align: start; 
   }
   .recent-card .card-body, .favorite-card .card-body { padding: 16px; }
@@ -1141,7 +1132,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     .filter { flex-shrink: 0; }
     
     /* Идеальные карточки в недавно просмотренных */
-    .recent-card, .favorite-card { flex: 0 0 160px; }
+    .recent-card, .favorite-card { min-width: 160px; max-width: 160px; }
     .recent-card .card-body, .favorite-card .card-body { padding: 12px; }
     .recent-card .card-title, .favorite-card .card-title { font-size: 14px; }
     .recent-card .price, .favorite-card .price { font-size: 16px; }
@@ -1620,23 +1611,14 @@ const indexHTML = String.raw`<!DOCTYPE html>
     timersInterval = setInterval(updateTimers, 1000);
   }
 
-  // Комфортная прокрутка колесиком мыши для горизонтальных блоков
+  // Исходная логика прокрутки колесиком мыши
   function enableWheelScroll(containerId) {
     var el = document.getElementById(containerId);
     if (el) {
       el.addEventListener('wheel', function(e) {
-        // Поддержка тачпадов (горизонтальный скролл) и обычных колесиков (вертикальный)
-        var delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
-        
-        if (delta !== 0) {
-          var maxScroll = el.scrollWidth - el.clientWidth;
-          // Если докрутили до края, отпускаем скролл страницы
-          if ((el.scrollLeft <= 0 && delta < 0) || (el.scrollLeft >= maxScroll - 1 && delta > 0)) {
-            return; 
-          }
+        if (e.deltaY !== 0) {
           e.preventDefault();
-          // Множитель 1.2 дает плавную и комфортную скорость (не слишком резко и не слишком медленно)
-          el.scrollLeft += delta * 1.2;
+          this.scrollLeft += e.deltaY;
         }
       }, { passive: false });
     }
