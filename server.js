@@ -1620,7 +1620,7 @@ const indexHTML = String.raw`<!DOCTYPE html>
     timersInterval = setInterval(updateTimers, 1000);
   }
 
-  // Быстрая и отзывчивая прокрутка колесиком мыши для горизонтальных блоков
+  // Комфортная прокрутка колесиком мыши для горизонтальных блоков
   function enableWheelScroll(containerId) {
     var el = document.getElementById(containerId);
     if (el) {
@@ -1635,8 +1635,8 @@ const indexHTML = String.raw`<!DOCTYPE html>
             return; 
           }
           e.preventDefault();
-          // Умножаем на 2.5, чтобы прокрутка была быстрой и не приходилось крутить колесико 10 раз
-          el.scrollLeft += delta * 2.5;
+          // Множитель 1.2 дает плавную и комфортную скорость (не слишком резко и не слишком медленно)
+          el.scrollLeft += delta * 1.2;
         }
       }, { passive: false });
     }
