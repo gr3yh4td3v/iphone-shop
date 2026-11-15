@@ -877,14 +877,13 @@ const indexHTML = String.raw`<!DOCTYPE html>
   .recent-header, .favorites-header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
   .recent-title, .favorites-title { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
   
-  /* Нативный горизонтальный скролл */
+  /* Нативный горизонтальный скролл (без smooth, чтобы колесико мыши не лагало) */
   .recent-grid, .favorites-grid { 
     display: flex; 
     gap: 20px; 
     overflow-x: auto; 
     padding-bottom: 20px; 
     scroll-snap-type: x proximity; 
-    scroll-behavior: smooth; 
     -webkit-overflow-scrolling: touch;
   }
   
@@ -1621,19 +1620,23 @@ const indexHTML = String.raw`<!DOCTYPE html>
     timersInterval = setInterval(updateTimers, 1000);
   }
 
-  // Прокрутка колесиком мыши для горизонтальных блоков
+  // Быстрая и отзывчивая прокрутка колесиком мыши для горизонтальных блоков
   function enableWheelScroll(containerId) {
     var el = document.getElementById(containerId);
     if (el) {
       el.addEventListener('wheel', function(e) {
-        if (e.deltaY !== 0) {
+        // Поддержка тачпадов (горизонтальный скролл) и обычных колесиков (вертикальный)
+        var delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+        
+        if (delta !== 0) {
           var maxScroll = el.scrollWidth - el.clientWidth;
-          // Если докрутили до края, даем странице скроллиться дальше
-          if ((el.scrollLeft === 0 && e.deltaY < 0) || (el.scrollLeft >= maxScroll && e.deltaY > 0)) {
+          // Если докрутили до края, отпускаем скролл страницы
+          if ((el.scrollLeft <= 0 && delta < 0) || (el.scrollLeft >= maxScroll - 1 && delta > 0)) {
             return; 
           }
           e.preventDefault();
-          el.scrollLeft += e.deltaY;
+          // Умножаем на 2.5, чтобы прокрутка была быстрой и не приходилось крутить колесико 10 раз
+          el.scrollLeft += delta * 2.5;
         }
       }, { passive: false });
     }
